@@ -46,7 +46,7 @@ func TestGenerateAIMDChart(t *testing.T) {
 	}
 
 	generator := NewGenerator()
-	testFile := "test_chart.png"
+	testFile := "test_chart.html"
 
 	// Clean up any existing test file
 	defer os.Remove(testFile)
@@ -136,12 +136,12 @@ func TestGenerateBaseComparisonChart(t *testing.T) {
 	}
 
 	generator := NewGenerator()
-	testFile := "test_base_comparison.png"
+	testFile := "test_base_comparison.html"
 
 	// Clean up any existing test files
 	defer func() {
 		os.Remove(testFile)
-		gasFile := strings.Replace(testFile, ".png", "_gas.png", 1)
+		gasFile := strings.Replace(testFile, ".html", "_gas.html", 1)
 		os.Remove(gasFile)
 	}()
 
@@ -162,7 +162,7 @@ func TestGenerateBaseComparisonChart(t *testing.T) {
 	}
 
 	// Verify gas usage file was also created
-	gasFile := strings.Replace(testFile, ".png", "_gas.png", 1)
+	gasFile := strings.Replace(testFile, ".html", "_gas.html", 1)
 	if _, err := os.Stat(gasFile); os.IsNotExist(err) {
 		t.Fatal("Gas usage chart file was not created")
 	}
@@ -193,7 +193,7 @@ func TestGenerateChartForScenario(t *testing.T) {
 
 	generator := NewGenerator()
 
-	expectedFile := "chart_test_scenario.png"
+	expectedFile := "chart_test_scenario.html"
 	defer os.Remove(expectedFile)
 	generator.GenerateChartForScenario(cfg, scenario)
 

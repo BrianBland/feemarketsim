@@ -92,7 +92,7 @@ func main() {
 	if simCfg.EnableGraphs {
 		fmt.Printf("\nVisualization files generated:\n")
 		for _, scenario := range scenariosToRun {
-			filename := fmt.Sprintf("chart_%s.png", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
+			filename := fmt.Sprintf("chart_%s.html", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
 			fmt.Printf("  - %s (AIMD fee evolution)\n", filename)
 		}
 	}
@@ -147,8 +147,8 @@ func runBasicSimulation(cfg config.Config, scenario scenarios.Scenario) {
 // handleFetchBase handles blockchain data fetching
 func handleFetchBase() {
 	if len(os.Args) < 5 {
-		fmt.Println("Usage: aimd-simulator fetch-base <start_block> <end_block> <output_file>")
-		fmt.Println("Example: aimd-simulator fetch-base 12000000 12000100 base_data.json")
+		fmt.Println("Usage: feemarketsim fetch-base <start_block> <end_block> <output_file>")
+		fmt.Println("Example: feemarketsim fetch-base 12000000 12000100 base_data.json")
 		return
 	}
 
@@ -235,9 +235,9 @@ func handleFetchBase() {
 // handleSimulateBase handles blockchain simulation
 func handleSimulateBase() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: aimd-simulator simulate-base <data_file> [-graph] [other flags...]")
-		fmt.Println("Example: aimd-simulator simulate-base base_data.json -graph")
-		fmt.Println("Example: aimd-simulator simulate-base base_data.json -graph -gamma=0.1 -alpha=0.02")
+		fmt.Println("Usage: feemarketsim simulate-base <data_file> [-graph] [other flags...]")
+		fmt.Println("Example: feemarketsim simulate-base base_data.json -graph")
+		fmt.Println("Example: feemarketsim simulate-base base_data.json -graph -gamma=0.1 -alpha=0.02")
 		return
 	}
 
@@ -286,12 +286,12 @@ func handleSimulateBase() {
 
 	// Generate charts if requested
 	if simCfg.EnableGraphs {
-		filename := fmt.Sprintf("base_comparison_%d_%d.png", dataset.StartBlock, dataset.EndBlock)
+		filename := fmt.Sprintf("base_comparison_%d_%d.html", dataset.StartBlock, dataset.EndBlock)
 		chartGenerator.GenerateBaseComparisonChart(*cfg, dataset, simResult, filename)
 
 		fmt.Printf("\nVisualization files generated:\n")
 		fmt.Printf("  - %s (AIMD vs Base fee comparison)\n", filename)
-		gasFilename := fmt.Sprintf("base_comparison_%d_%d_gas.png", dataset.StartBlock, dataset.EndBlock)
+		gasFilename := fmt.Sprintf("base_comparison_%d_%d_gas.html", dataset.StartBlock, dataset.EndBlock)
 		fmt.Printf("  - %s (Gas usage analysis)\n", gasFilename)
 	}
 }

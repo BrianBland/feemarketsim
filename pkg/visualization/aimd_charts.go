@@ -8,7 +8,8 @@ import (
 	"github.com/brianbland/feemarketsim/pkg/config"
 	"github.com/brianbland/feemarketsim/pkg/scenarios"
 	"github.com/brianbland/feemarketsim/pkg/simulator"
-	"github.com/wcharczuk/go-chart/v2"
+	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
 // GenerateAIMDChart creates a comprehensive chart for AIMD simulation results
@@ -29,57 +30,89 @@ func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scen
 		data.GasUsages = append(data.GasUsages, float64(gasUsed)/1e6)              // Convert to millions
 	}
 
-	// Create the main chart
-	graph := chart.Chart{
-		Title:  fmt.Sprintf("AIMD Fee Mechanism: %s", scenario.Name),
-		Width:  1200,
-		Height: 800,
-		Background: chart.Style{
-			Padding: chart.Box{
-				Top:    40,
-				Left:   40,
-				Right:  40,
-				Bottom: 40,
-			},
-		},
-		XAxis: chart.XAxis{
+	// Create line chart
+	line := charts.NewLine()
+
+	// Set global options
+	line.SetGlobalOptions(
+		charts.WithInitializationOpts(opts.Initialization{
+			Width:  "1200px",
+			Height: "800px",
+		}),
+		charts.WithTitleOpts(opts.Title{
+			Title:    fmt.Sprintf("AIMD Fee Mechanism: %s", scenario.Name),
+			Subtitle: "Base Fee and Learning Rate Analysis",
+		}),
+		charts.WithXAxisOpts(opts.XAxis{
 			Name: "Block Number",
-		},
-		YAxis: chart.YAxis{
+			Type: "value",
+		}),
+		charts.WithYAxisOpts(opts.YAxis{
 			Name: "Base Fee (Gwei)",
-		},
-		Series: []chart.Series{
-			chart.ContinuousSeries{
-				Name:    "Base Fee (Gwei)",
-				XValues: data.BlockNumbers,
-				YValues: data.BaseFees,
-				Style: chart.Style{
-					StrokeColor: chart.ColorRed,
-					StrokeWidth: 2,
+			Type: "value",
+		}),
+		charts.WithLegendOpts(opts.Legend{
+			Show: opts.Bool(true),
+			Top:  "10%",
+		}),
+		charts.WithToolboxOpts(opts.Toolbox{
+			Show: opts.Bool(true),
+			Feature: &opts.ToolBoxFeature{
+				SaveAsImage: &opts.ToolBoxFeatureSaveAsImage{
+					Show:  opts.Bool(true),
+					Type:  "png",
+					Title: "Save as Image",
+				},
+				DataZoom: &opts.ToolBoxFeatureDataZoom{
+					Show:  opts.Bool(true),
+					Title: map[string]string{"zoom": "Zoom", "back": "Back"},
 				},
 			},
-			chart.ContinuousSeries{
-				Name:    "Learning Rate (%)",
-				XValues: data.BlockNumbers,
-				YValues: data.LearningRates,
-				Style: chart.Style{
-					StrokeColor:     chart.ColorBlue,
-					StrokeWidth:     1,
-					StrokeDashArray: []float64{5, 5},
-				},
-				YAxis: chart.YAxisSecondary,
+		}),
+	)
+
+	// Add second Y-axis for learning rate (positioned on the right)
+	line.ExtendYAxis(
+		opts.YAxis{
+			Name:     "Learning Rate (%)",
+			Type:     "value",
+			Position: "right",
+			SplitLine: &opts.SplitLine{
+				Show: opts.Bool(false), // Hide grid lines for secondary axis to reduce clutter
 			},
 		},
+	)
+
+	// Prepare data for line series with [x, y] coordinate pairs
+	baseFeeData := make([]opts.LineData, len(data.BaseFees))
+	for i, fee := range data.BaseFees {
+		baseFeeData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], fee}}
 	}
 
-	// Add secondary Y-axis for learning rate
-	graph.YAxisSecondary = chart.YAxis{
-		Name: "Learning Rate (%)",
+	learningRateData := make([]opts.LineData, len(data.LearningRates))
+	for i, rate := range data.LearningRates {
+		learningRateData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], rate}}
 	}
 
-	// Add legend
-	graph.Elements = []chart.Renderable{
-		chart.LegendThin(&graph),
+	// Add series with coordinate data - base fees use primary Y-axis (index 0)
+	line.AddSeries("Base Fee (Gwei)", baseFeeData,
+		charts.WithLineChartOpts(opts.LineChart{
+			Smooth: opts.Bool(true),
+		}),
+	).
+		AddSeries("Learning Rate (%)", learningRateData,
+			charts.WithLineChartOpts(opts.LineChart{
+				YAxisIndex: 1, // Use second Y-axis (right side)
+				Smooth:     opts.Bool(true),
+			}),
+			charts.WithLineStyleOpts(opts.LineStyle{
+				Type: "dashed",
+			}),
+		)
+
+	// Ensure filename has .html extension
+	if !strings.HasSuffix(filename, ".html") {
+		filename = strings.TrimSuffix(filename, ".png") + ".html"
 	}
 
 	// Save the chart
@@ -89,18 +122,18 @@ func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scen
 	}
 	defer file.Close()
 
-	if err := graph.Render(chart.PNG, file); err != nil {
+	if err := line.Render(file); err != nil {
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
-	fmt.Printf("Chart saved to %s\n", filename)
+	fmt.Printf("Interactive chart saved to %s\n", filename)
 	return nil
 }
 
 // GenerateChartForScenario creates a chart for a given scenario
 func (g *Generator) GenerateChartForScenario(cfg config.Config, scenario scenarios.Scenario) {
-	// Create filename based on scenario name
-	filename := fmt.Sprintf("chart_%s.png", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
+	// Create filename based on scenario name - use .html extension for interactive charts
+	filename := fmt.Sprintf("chart_%s.html", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
 
 	if err := g.GenerateAIMDChart(cfg, scenario, filename); err != nil {
 		fmt.Printf("Warning: failed to generate chart for %s: %v\n", scenario.Name, err)

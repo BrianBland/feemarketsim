@@ -7,8 +7,8 @@ import (
 
 	"github.com/brianbland/feemarketsim/pkg/blockchain"
 	"github.com/brianbland/feemarketsim/pkg/config"
-	"github.com/wcharczuk/go-chart/v2"
-	"github.com/wcharczuk/go-chart/v2/drawing"
+	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
 // GenerateBaseComparisonChart creates a comparison chart between Base and AIMD mechanisms
@@ -19,68 +19,105 @@ func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *bloc
 
 	data := simResult.ComparisonData
 
-	// Create the comparison plot
-	graph := chart.Chart{
-		Title:  fmt.Sprintf("Base vs AIMD Fee Comparison (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
-		Width:  1400,
-		Height: 1000,
-		Background: chart.Style{
-			Padding: chart.Box{
-				Top:    40,
-				Left:   40,
-				Right:  40,
-				Bottom: 40,
-			},
-		},
-		XAxis: chart.XAxis{
+	// Create line chart for comparison
+	line := charts.NewLine()
+
+	// Set global options
+	line.SetGlobalOptions(
+		charts.WithInitializationOpts(opts.Initialization{
+			Width:  "1400px",
+			Height: "1000px",
+		}),
+		charts.WithTitleOpts(opts.Title{
+			Title:    fmt.Sprintf("Base vs AIMD Fee Comparison (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
+			Subtitle: "Fee Mechanism Comparison Analysis",
+		}),
+		charts.WithXAxisOpts(opts.XAxis{
 			Name: "Block Number",
-		},
-		YAxis: chart.YAxis{
+			Type: "value",
+		}),
+		charts.WithYAxisOpts(opts.YAxis{
 			Name: "Base Fee (Gwei)",
+			Type: "value",
+		}),
+		charts.WithLegendOpts(opts.Legend{
+			Show: opts.Bool(true),
+			Top:  "10%",
+		}),
+		charts.WithToolboxOpts(opts.Toolbox{
+			Show: opts.Bool(true),
+			Feature: &opts.ToolBoxFeature{
+				SaveAsImage: &opts.ToolBoxFeatureSaveAsImage{
+					Show:  opts.Bool(true),
+					Type:  "png",
+					Title: "Save as Image",
+				},
+				DataZoom: &opts.ToolBoxFeatureDataZoom{
+					Show:  opts.Bool(true),
+					Title: map[string]string{"zoom": "Zoom", "back": "Back"},
+				},
+			},
+		}),
+	)
+
+	// Add second Y-axis for dropped transaction percentage (positioned on the right)
+	line.ExtendYAxis(
+		opts.YAxis{
+			Name:     "Dropped Tx %",
+			Type:     "value",
+			Position: "right",
+			SplitLine: &opts.SplitLine{
+				Show: opts.Bool(false), // Hide grid lines for secondary axis to reduce clutter
+			},
 		},
-		Series: []chart.Series{
-			chart.ContinuousSeries{
-				Name:    "Actual Base Fees",
-				XValues: data.BlockNumbers,
-				YValues: data.ActualBaseFees,
-				Style: chart.Style{
-					StrokeColor: chart.ColorOrange,
-					StrokeWidth: 3,
-				},
-			},
-			chart.ContinuousSeries{
-				Name:    "AIMD Fees",
-				XValues: data.BlockNumbers,
-				YValues: data.AIMDBaseFees,
-				Style: chart.Style{
-					StrokeColor:     drawing.Color{R: 0, G: 150, B: 255, A: 255},
-					StrokeWidth:     2,
-					StrokeDashArray: []float64{8, 4},
-				},
-			},
-			chart.ContinuousSeries{
-				Name:    "Dropped Tx %",
-				XValues: data.BlockNumbers,
-				YValues: data.DroppedPercentages,
-				Style: chart.Style{
-					StrokeColor: chart.ColorRed,
-					StrokeWidth: 1,
-					FillColor:   drawing.Color{R: 255, G: 0, B: 0, A: 50},
-				},
-				YAxis: chart.YAxisSecondary,
-			},
-		},
+	)
+
+	// Prepare data for line series with [x, y] coordinate pairs
+	actualBaseFeeData := make([]opts.LineData, len(data.ActualBaseFees))
+	for i, fee := range data.ActualBaseFees {
+		actualBaseFeeData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], fee}}
 	}
 
-	// Add secondary Y-axis for dropped transactions
-	graph.YAxisSecondary = chart.YAxis{
-		Name: "Dropped Tx %",
+	aimdBaseFeeData := make([]opts.LineData, len(data.AIMDBaseFees))
+	for i, fee := range data.AIMDBaseFees {
+		aimdBaseFeeData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], fee}}
 	}
 
-	// Add legend
-	graph.Elements = []chart.Renderable{
-		chart.LegendThin(&graph),
+	droppedPercentageData := make([]opts.LineData, len(data.DroppedPercentages))
+	for i, pct := range data.DroppedPercentages {
+		droppedPercentageData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], pct}}
 	}
+
+	// Add series with coordinate data - fee series use primary Y-axis (index 0)
+	line.AddSeries("Actual Base Fees", actualBaseFeeData,
+		charts.WithLineChartOpts(opts.LineChart{
+			Smooth: opts.Bool(true),
+		}),
+		charts.WithLineStyleOpts(opts.LineStyle{
+			Width: 3,
+		}),
+	).
+		AddSeries("AIMD Fees", aimdBaseFeeData,
+			charts.WithLineChartOpts(opts.LineChart{
+				Smooth: opts.Bool(true),
+			}),
+			charts.WithLineStyleOpts(opts.LineStyle{
+				Width: 2,
+				Type:  "dashed",
+			}),
+		).
+		AddSeries("Dropped Tx %", droppedPercentageData,
+			charts.WithLineChartOpts(opts.LineChart{
+				YAxisIndex: 1, // Use second Y-axis (right side)
+				Smooth:     opts.Bool(true),
+			}),
+			charts.WithLineStyleOpts(opts.LineStyle{
+				Width: 1,
+			}),
+			charts.WithAreaStyleOpts(opts.AreaStyle{
+				Opacity: 0.3,
+			}),
+		)
 
 	// Save the chart
 	file, err := os.Create(filename)
@@ -89,14 +126,14 @@ func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *bloc
 	}
 	defer file.Close()
 
-	if err := graph.Render(chart.PNG, file); err != nil {
+	if err := line.Render(file); err != nil {
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
 	fmt.Printf("Base comparison chart saved to %s\n", filename)
 
 	// Also generate a detailed gas usage comparison
-	gasFilename := strings.Replace(filename, ".png", "_gas.png", 1)
+	gasFilename := strings.Replace(filename, ".html", "_gas.html", 1)
 	if err := g.generateGasUsageComparison(data, gasFilename, dataset); err != nil {
 		fmt.Printf("Warning: failed to generate gas usage chart: %v\n", err)
 	}
@@ -106,72 +143,93 @@ func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *bloc
 
 // generateGasUsageComparison creates a separate chart for gas usage analysis
 func (g *Generator) generateGasUsageComparison(data *blockchain.ComparisonData, filename string, dataset *blockchain.DataSet) error {
-	graph := chart.Chart{
-		Title:  fmt.Sprintf("Gas Usage Analysis (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
-		Width:  1200,
-		Height: 800,
-		Background: chart.Style{
-			Padding: chart.Box{
-				Top:    40,
-				Left:   40,
-				Right:  40,
-				Bottom: 40,
-			},
-		},
-		XAxis: chart.XAxis{
+	// Create line chart for gas usage
+	line := charts.NewLine()
+
+	// Set global options
+	line.SetGlobalOptions(
+		charts.WithInitializationOpts(opts.Initialization{
+			Width:  "1200px",
+			Height: "800px",
+		}),
+		charts.WithTitleOpts(opts.Title{
+			Title:    fmt.Sprintf("Gas Usage Analysis (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
+			Subtitle: "Gas Usage Patterns and Target Analysis",
+		}),
+		charts.WithXAxisOpts(opts.XAxis{
 			Name: "Block Number",
-		},
-		YAxis: chart.YAxis{
+			Type: "value",
+		}),
+		charts.WithYAxisOpts(opts.YAxis{
 			Name: "Gas Usage (Millions)",
-		},
-		Series: []chart.Series{
-			chart.ContinuousSeries{
-				Name:    "Actual Gas Usage",
-				XValues: data.BlockNumbers,
-				YValues: data.ActualGasUsages,
-				Style: chart.Style{
-					StrokeColor: chart.ColorGreen,
-					StrokeWidth: 2,
+			Type: "value",
+		}),
+		charts.WithLegendOpts(opts.Legend{
+			Show: opts.Bool(true),
+			Top:  "10%",
+		}),
+		charts.WithToolboxOpts(opts.Toolbox{
+			Show: opts.Bool(true),
+			Feature: &opts.ToolBoxFeature{
+				SaveAsImage: &opts.ToolBoxFeatureSaveAsImage{
+					Show:  opts.Bool(true),
+					Type:  "png",
+					Title: "Save as Image",
+				},
+				DataZoom: &opts.ToolBoxFeatureDataZoom{
+					Show:  opts.Bool(true),
+					Title: map[string]string{"zoom": "Zoom", "back": "Back"},
 				},
 			},
-			chart.ContinuousSeries{
-				Name:    "Effective Gas (after drops)",
-				XValues: data.BlockNumbers,
-				YValues: data.EffectiveGasUsages,
-				Style: chart.Style{
-					StrokeColor:     chart.ColorRed,
-					StrokeWidth:     2,
-					StrokeDashArray: []float64{5, 5},
-				},
-			},
-		},
+		}),
+	)
+
+	// Prepare data for line series with [x, y] coordinate pairs
+	actualGasData := make([]opts.LineData, len(data.ActualGasUsages))
+	for i, gas := range data.ActualGasUsages {
+		actualGasData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], gas}}
 	}
+
+	effectiveGasData := make([]opts.LineData, len(data.EffectiveGasUsages))
+	for i, gas := range data.EffectiveGasUsages {
+		effectiveGasData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], gas}}
+	}
+
+	// Add series with coordinate data (no need to set X-axis for numeric data)
+	line.AddSeries("Actual Gas Usage", actualGasData,
+		charts.WithLineStyleOpts(opts.LineStyle{
+			Width: 2,
+		}),
+	).
+		AddSeries("Effective Gas (after drops)", effectiveGasData,
+			charts.WithLineStyleOpts(opts.LineStyle{
+				Width: 2,
+				Type:  "dashed",
+			}),
+		)
 
 	// Add target line if we can estimate it
 	if len(data.BlockNumbers) > 0 {
 		targetGas := float64(dataset.InitialGasLimit) / 2 / 1e6 // Assume 50% target
-		targetValues := make([]float64, len(data.BlockNumbers))
-		for i := range targetValues {
-			targetValues[i] = targetGas
+		targetGasData := make([]opts.LineData, len(data.BlockNumbers))
+		for i := range targetGasData {
+			targetGasData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], targetGas}}
 		}
 
-		targetSeries := chart.ContinuousSeries{
-			Name:    "Target Gas Usage",
-			XValues: data.BlockNumbers,
-			YValues: targetValues,
-			Style: chart.Style{
-				StrokeColor:     drawing.Color{R: 100, G: 100, B: 100, A: 255},
-				StrokeWidth:     1,
-				StrokeDashArray: []float64{10, 5},
-			},
-		}
-		graph.Series = append(graph.Series, targetSeries)
+		line.AddSeries("Target Gas Usage", targetGasData,
+			charts.WithLineStyleOpts(opts.LineStyle{
+				Width: 1,
+				Type:  "dotted",
+			}),
+		)
 	}
 
-	// Add legend
-	graph.Elements = []chart.Renderable{
-		chart.LegendThin(&graph),
-	}
+	// Set series options for better visualization
+	line.SetSeriesOptions(
+		charts.WithLineChartOpts(opts.LineChart{
+			Smooth: opts.Bool(true),
+		}),
+	)
 
 	// Save the chart
 	file, err := os.Create(filename)
@@ -180,5 +238,5 @@ func (g *Generator) generateGasUsageComparison(data *blockchain.ComparisonData, 
 	}
 	defer file.Close()
 
-	return graph.Render(chart.PNG, file)
+	return line.Render(file)
 }

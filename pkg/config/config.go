@@ -27,6 +27,7 @@ type SimulationConfig struct {
 	Scenario     string
 	EnableGraphs bool
 	ShowHelp     bool
+	NoAIMD       bool // Use standard EIP-1559 without AIMD
 }
 
 // Default returns a configuration with sensible defaults
@@ -48,6 +49,25 @@ func Default() Config {
 	}
 }
 
+// EIP1559 returns a configuration with EIP-1559 defaults (no AIMD)
+func EIP1559() Config {
+	return Config{
+		TargetBlockSize:     15_000_000,
+		BurstMultiplier:     2.0,
+		WindowSize:          1,   // EIP-1559: single block window
+		Gamma:               1.0, // EIP-1559: no learning rate adjustment
+		MaxLearningRate:     0.125,
+		MinLearningRate:     0.125,
+		Alpha:               0.0, // EIP-1559: no additive increase
+		Beta:                1.0, // EIP-1559: no multiplicative decrease
+		Delta:               0.0, // EIP-1559: no net gas delta
+		InitialBaseFee:      1_000_000_000,
+		InitialLearningRate: 0.125,
+		RandomnessFactor:    0.1,
+		MinBaseFee:          0,
+	}
+}
+
 // Parser handles command-line flag parsing
 type Parser struct {
 	config    *Config
@@ -62,9 +82,10 @@ func NewParser() *Parser {
 		Scenario:     "all",
 		EnableGraphs: false,
 		ShowHelp:     false,
+		NoAIMD:       false,
 	}
 
-	flagSet := flag.NewFlagSet("aimd-simulator", flag.ExitOnError)
+	flagSet := flag.NewFlagSet("feemarketsim", flag.ExitOnError)
 
 	return &Parser{
 		config:    &config,
@@ -92,8 +113,9 @@ func (p *Parser) RegisterFlags() {
 
 	// Simulation configuration flags
 	p.flagSet.StringVar(&p.simConfig.Scenario, "scenario", p.simConfig.Scenario, "Scenario to run: full, empty, stable, mixed, or all")
-	p.flagSet.BoolVar(&p.simConfig.EnableGraphs, "graph", p.simConfig.EnableGraphs, "Generate visualization charts (PNG files)")
+	p.flagSet.BoolVar(&p.simConfig.EnableGraphs, "graph", p.simConfig.EnableGraphs, "Generate visualization charts (HTML files)")
 	p.flagSet.BoolVar(&p.simConfig.ShowHelp, "help", p.simConfig.ShowHelp, "Show detailed help and parameter explanations")
+	p.flagSet.BoolVar(&p.simConfig.NoAIMD, "no-aimd", p.simConfig.NoAIMD, "Use EIP-1559 instead of AIMD")
 }
 
 // Parse parses command-line arguments and returns configuration
@@ -109,6 +131,21 @@ func (p *Parser) Parse(args []string) (*Config, *SimulationConfig, error) {
 		return p.config, p.simConfig, nil
 	}
 
+	// Apply EIP-1559 configuration if no-aimd flag is set
+	if p.simConfig.NoAIMD {
+		eip1559Config := EIP1559()
+		// Preserve non-AIMD specific settings from user flags
+		eip1559Config.TargetBlockSize = p.config.TargetBlockSize
+		eip1559Config.BurstMultiplier = p.config.BurstMultiplier
+		eip1559Config.MaxLearningRate = p.config.MaxLearningRate
+		eip1559Config.MinLearningRate = p.config.MinLearningRate
+		eip1559Config.InitialBaseFee = p.config.InitialBaseFee
+		eip1559Config.InitialLearningRate = p.config.InitialLearningRate
+		eip1559Config.RandomnessFactor = p.config.RandomnessFactor
+		eip1559Config.MinBaseFee = p.config.MinBaseFee
+		p.config = &eip1559Config
+	}
+
 	if err := p.Validate(); err != nil {
 		return nil, nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
@@ -120,6 +157,22 @@ func (p *Parser) Parse(args []string) (*Config, *SimulationConfig, error) {
 func (p *Parser) Validate() error {
 	c := p.config
 	s := p.simConfig
+
+	// Check for conflicting flags with no-aimd
+	if s.NoAIMD {
+		conflictingFlags := []string{}
+
+		p.flagSet.Visit(func(f *flag.Flag) {
+			switch f.Name {
+			case "alpha", "beta", "gamma", "delta", "window-size":
+				conflictingFlags = append(conflictingFlags, f.Name)
+			}
+		})
+
+		if len(conflictingFlags) > 0 {
+			return fmt.Errorf("no-aimd flag cannot be combined with AIMD-specific flags: %v", conflictingFlags)
+		}
+	}
 
 	if c.BurstMultiplier <= 1.0 {
 		return fmt.Errorf("burst multiplier (%.3f) must be greater than 1.0", c.BurstMultiplier)
@@ -182,20 +235,20 @@ func (p *Parser) ShowDetailedHelp() {
 	fmt.Println()
 
 	fmt.Println("Basic AIMD Simulation:")
-	fmt.Println("  aimd-simulator [flags]                   # Run with synthetic scenarios")
-	fmt.Println("  aimd-simulator -scenario=full -graph     # Run specific scenario with charts")
-	fmt.Println("  aimd-simulator -help                     # Show this help")
+	fmt.Println("  feemarketsim [flags]                   # Run with synthetic scenarios")
+	fmt.Println("  feemarketsim -scenario=full -graph     # Run specific scenario with charts")
+	fmt.Println("  feemarketsim -help                     # Show this help")
 	fmt.Println()
 
 	fmt.Println("Base Blockchain Integration:")
-	fmt.Println("  aimd-simulator fetch-base <start> <end> <file>  # Fetch blockchain data")
-	fmt.Println("    - Example: aimd-simulator fetch-base 12000000 12000100 data.json")
+	fmt.Println("  feemarketsim fetch-base <start> <end> <file>  # Fetch blockchain data")
+	fmt.Println("    - Example: feemarketsim fetch-base 12000000 12000100 data.json")
 	fmt.Println("    - Downloads real Base blockchain data for analysis")
 	fmt.Println("    - Supports concurrent fetching with retry logic")
 	fmt.Println("    - Warns for large ranges (>10,000 blocks)")
 	fmt.Println()
-	fmt.Println("  aimd-simulator simulate-base <file> [flags]     # Simulate against real data")
-	fmt.Println("    - Example: aimd-simulator simulate-base data.json -graph -gamma=0.1")
+	fmt.Println("  feemarketsim simulate-base <file> [flags]     # Simulate against real data")
+	fmt.Println("    - Example: feemarketsim simulate-base data.json -graph -gamma=0.1")
 	fmt.Println("    - Runs AIMD algorithm against fetched blockchain data")
 	fmt.Println("    - Supports all AIMD parameter flags")
 	fmt.Println("    - Generates comparison charts with -graph")
@@ -248,63 +301,71 @@ func (p *Parser) ShowDetailedHelp() {
 	fmt.Println("                               - stable: Long-term stability (40 blocks)")
 	fmt.Println("                               - mixed:  Realistic traffic patterns (80 blocks)")
 	fmt.Println("                               - all:    Run all scenarios sequentially")
-	fmt.Println("  -graph                       Generate visualization charts (PNG files)")
+	fmt.Println("  -graph                       Generate visualization charts (HTML files)")
 	fmt.Println("                               Creates fee evolution and comparison charts")
+	fmt.Println("  -no-aimd                     Use EIP-1559 instead of AIMD")
+	fmt.Println("                               Sets: alpha=0, beta=1, gamma=1, delta=0, window-size=1")
+	fmt.Println("                               Cannot be combined with those individual flags")
 	fmt.Println()
 
 	fmt.Println("EXAMPLE WORKFLOWS:")
 	fmt.Println()
 
 	fmt.Println("Quick Start:")
-	fmt.Println("  aimd-simulator                           # Run with default settings")
-	fmt.Println("  aimd-simulator -scenario=mixed -graph    # Test mixed traffic with charts")
-	fmt.Println("  aimd-simulator -help                     # Show this help")
+	fmt.Println("  feemarketsim                           # Run with default settings")
+	fmt.Println("  feemarketsim -scenario=mixed -graph    # Test mixed traffic with charts")
+	fmt.Println("  feemarketsim -no-aimd                  # Use EIP-1559 instead of AIMD")
+	fmt.Println("  feemarketsim -help                     # Show this help")
 	fmt.Println()
 
 	fmt.Println("Parameter Testing:")
 	fmt.Println("  # Test burst capacity effects")
-	fmt.Println("  aimd-simulator -burst-multiplier=1.5 -scenario=full")
-	fmt.Println("  aimd-simulator -burst-multiplier=3.0 -scenario=full")
+	fmt.Println("  feemarketsim -burst-multiplier=1.5 -scenario=full")
+	fmt.Println("  feemarketsim -burst-multiplier=3.0 -scenario=full")
 	fmt.Println()
 	fmt.Println("  # Compare learning strategies")
-	fmt.Println("  aimd-simulator -gamma=0.1 -alpha=0.02    # Aggressive response")
-	fmt.Println("  aimd-simulator -gamma=0.5 -alpha=0.005   # Conservative response")
+	fmt.Println("  feemarketsim -gamma=0.1 -alpha=0.02    # Aggressive response")
+	fmt.Println("  feemarketsim -gamma=0.5 -alpha=0.005   # Conservative response")
+	fmt.Println()
+	fmt.Println("  # Compare AIMD vs EIP-1559")
+	fmt.Println("  feemarketsim -scenario=mixed -graph    # AIMD algorithm")
+	fmt.Println("  feemarketsim -no-aimd -scenario=mixed -graph  # EIP-1559 baseline")
 	fmt.Println()
 	fmt.Println("  # Test randomness impact")
-	fmt.Println("  aimd-simulator -randomness=0.0           # Deterministic")
-	fmt.Println("  aimd-simulator -randomness=0.3           # High variation")
+	fmt.Println("  feemarketsim -randomness=0.0           # Deterministic")
+	fmt.Println("  feemarketsim -randomness=0.3           # High variation")
 	fmt.Println()
 
 	fmt.Println("Real Data Analysis:")
 	fmt.Println("  # 1. Fetch blockchain data")
-	fmt.Println("  aimd-simulator fetch-base 12000000 12001000 analysis.json")
+	fmt.Println("  feemarketsim fetch-base 12000000 12001000 analysis.json")
 	fmt.Println()
 	fmt.Println("  # 2. Test different configurations")
-	fmt.Println("  aimd-simulator simulate-base analysis.json -graph")
-	fmt.Println("  aimd-simulator simulate-base analysis.json -gamma=0.1 -graph")
-	fmt.Println("  aimd-simulator simulate-base analysis.json -burst-multiplier=2.5 -graph")
+	fmt.Println("  feemarketsim simulate-base analysis.json -graph")
+	fmt.Println("  feemarketsim simulate-base analysis.json -gamma=0.1 -graph")
+	fmt.Println("  feemarketsim simulate-base analysis.json -burst-multiplier=2.5 -graph")
 	fmt.Println()
 	fmt.Println("  # 3. Performance comparison")
-	fmt.Println("  aimd-simulator simulate-base analysis.json -window-size=5    # Fast")
-	fmt.Println("  aimd-simulator simulate-base analysis.json -window-size=20   # Stable")
+	fmt.Println("  feemarketsim simulate-base analysis.json -window-size=5    # Fast")
+	fmt.Println("  feemarketsim simulate-base analysis.json -window-size=20   # Stable")
 	fmt.Println()
 
 	fmt.Println("Advanced Usage:")
 	fmt.Println("  # Custom fee market setup")
-	fmt.Println("  aimd-simulator -initial-base-fee=2000000000 -min-base-fee=500000000")
+	fmt.Println("  feemarketsim -initial-base-fee=2000000000 -min-base-fee=500000000")
 	fmt.Println()
 	fmt.Println("  # High-precision delta tuning")
-	fmt.Println("  aimd-simulator -delta=0.000005 -window-size=15")
+	fmt.Println("  feemarketsim -delta=0.000005 -window-size=15")
 	fmt.Println()
 	fmt.Println("  # Large block size testing")
-	fmt.Println("  aimd-simulator -target-block-size=30000000 -burst-multiplier=2.5")
+	fmt.Println("  feemarketsim -target-block-size=30000000 -burst-multiplier=2.5")
 	fmt.Println()
 
 	fmt.Println("OUTPUT FILES:")
 	fmt.Println("  When -graph is enabled, the following files are generated:")
-	fmt.Println("  - chart_<scenario>.png           AIMD fee evolution charts")
-	fmt.Println("  - base_comparison_<range>.png    AIMD vs Base fee comparison")
-	fmt.Println("  - base_comparison_<range>_gas.png Gas usage analysis")
+	fmt.Println("  - chart_<scenario>.html            AIMD fee evolution charts")
+	fmt.Println("  - base_comparison_<range>.html     AIMD vs Base fee comparison")
+	fmt.Println("  - base_comparison_<range>_gas.html Gas usage analysis")
 	fmt.Println()
 
 	fmt.Println("PERFORMANCE NOTES:")

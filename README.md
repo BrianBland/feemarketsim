@@ -9,6 +9,7 @@ A comprehensive implementation of an enhanced **Additive Increase Multiplicative
 - **Adaptive learning rates** with configurable thresholds and constraints
 - **Randomness injection** for realistic testing scenarios
 - **Extended analysis windows** with comprehensive statistical reporting
+- **EIP-1559 compatibility mode** for baseline comparison and standard behavior
 
 ### 🔗 **Real Blockchain Integration**
 - **Base blockchain data fetching** with concurrent processing
@@ -81,6 +82,17 @@ The simulator is built with a modular architecture designed for maintainability 
    newBaseFee = currentBaseFee * (1 + learningRate * (currentBlockSize - targetBlockSize) / targetBlockSize) + δ * netGasDelta(window)
    ```
 
+### EIP-1559 Compatibility Mode
+
+When using the `-no-aimd` flag, the simulator switches to standard EIP-1559 behavior by setting:
+- **Alpha (α) = 0**: No additive learning rate increases
+- **Beta (β) = 1**: No multiplicative learning rate decreases
+- **Gamma (γ) = 1**: No learning rate adjustments based on utilization deviation
+- **Delta (δ) = 0**: No net gas delta from historical window
+- **Window Size = 1**: Single block analysis (standard EIP-1559)
+
+This provides a baseline for comparing the enhanced AIMD algorithm against the original EIP-1559 specification.
+
 ### Configuration Parameters
 
 | Parameter | Description | Default Value |
@@ -103,10 +115,10 @@ The simulator is built with a modular architecture designed for maintainability 
 ```bash
 # Clone the repository
 git clone https://github.com/brianbland/feemarketsim
-cd aimd-fee-simulator
+cd feemarketsim
 
 # Build the simulator
-go build -o aimd-simulator cmd/simulator/main.go
+go build -o feemarketsim cmd/simulator/main.go
 
 # Or run directly
 go run cmd/simulator/main.go
@@ -116,19 +128,26 @@ go run cmd/simulator/main.go
 
 ```bash
 # Run all scenarios with default parameters
-./aimd-simulator
+./feemarketsim
 
 # Run specific scenario
-./aimd-simulator -scenario=mixed
+./feemarketsim -scenario=mixed
 
 # Generate visualization charts
-./aimd-simulator -scenario=stable -graph
+./feemarketsim -scenario=stable -graph
+
+# Use standard EIP-1559 instead of AIMD
+./feemarketsim -no-aimd
+
+# Compare AIMD vs EIP-1559 behavior
+./feemarketsim -scenario=mixed -graph                    # AIMD algorithm
+./feemarketsim -no-aimd -scenario=mixed -graph           # EIP-1559 baseline
 
 # Custom parameter testing
-./aimd-simulator -gamma=0.1 -alpha=0.02 -burst-multiplier=2.5
+./feemarketsim -gamma=0.1 -alpha=0.02 -burst-multiplier=2.5
 
 # High randomness testing
-./aimd-simulator -randomness=0.3 -scenario=mixed -graph
+./feemarketsim -randomness=0.3 -scenario=mixed -graph
 ```
 
 ### Real Blockchain Data Analysis
@@ -137,13 +156,13 @@ go run cmd/simulator/main.go
 
 ```bash
 # Fetch small range for testing
-./aimd-simulator fetch-base 12000000 12000010 test_data.json
+./feemarketsim fetch-base 12000000 12000010 test_data.json
 
 # Fetch larger dataset (with confirmation prompt)
-./aimd-simulator fetch-base 12000000 12001000 base_data.json
+./feemarketsim fetch-base 12000000 12001000 base_data.json
 
 # Fetch recent data
-./aimd-simulator fetch-base 18000000 18000500 recent_base.json
+./feemarketsim fetch-base 18000000 18000500 recent_base.json
 ```
 
 **Features:**
@@ -157,14 +176,14 @@ go run cmd/simulator/main.go
 
 ```bash
 # Basic simulation against real data
-./aimd-simulator simulate-base base_data.json
+./feemarketsim simulate-base base_data.json
 
 # With custom parameters and visualization
-./aimd-simulator simulate-base base_data.json -graph -gamma=0.1 -alpha=0.02
+./feemarketsim simulate-base base_data.json -graph -gamma=0.1 -alpha=0.02
 
 # Conservative vs aggressive comparison
-./aimd-simulator simulate-base base_data.json -gamma=0.5 -beta=0.95  # Conservative
-./aimd-simulator simulate-base base_data.json -gamma=0.1 -alpha=0.03  # Aggressive
+./feemarketsim simulate-base base_data.json -gamma=0.5 -beta=0.95  # Conservative
+./feemarketsim simulate-base base_data.json -gamma=0.1 -alpha=0.03  # Aggressive
 ```
 
 ### Advanced Configuration Examples
@@ -172,25 +191,25 @@ go run cmd/simulator/main.go
 #### Burst Capacity Tuning
 ```bash
 # Conservative burst (50% above target)
-./aimd-simulator -burst-multiplier=1.5 -gamma=0.3
+./feemarketsim -burst-multiplier=1.5 -gamma=0.3
 
 # Aggressive burst (300% above target)
-./aimd-simulator -burst-multiplier=3.0 -gamma=0.1
+./feemarketsim -burst-multiplier=3.0 -gamma=0.1
 
 # Ethereum-like configuration
-./aimd-simulator -burst-multiplier=2.0 -gamma=0.2
+./feemarketsim -burst-multiplier=2.0 -gamma=0.2
 ```
 
 #### Learning Rate Strategies
 ```bash
 # Stable fees (slow adaptation)
-./aimd-simulator -gamma=0.5 -alpha=0.005 -window-size=20
+./feemarketsim -gamma=0.5 -alpha=0.005 -window-size=20
 
 # Responsive fees (fast adaptation)
-./aimd-simulator -gamma=0.1 -alpha=0.02 -window-size=5
+./feemarketsim -gamma=0.1 -alpha=0.02 -window-size=5
 
 # Balanced approach
-./aimd-simulator -gamma=0.2 -alpha=0.01 -window-size=10
+./feemarketsim -gamma=0.2 -alpha=0.01 -window-size=10
 ```
 
 ### Complete Command Reference
@@ -220,6 +239,9 @@ go run cmd/simulator/main.go
 -randomness=0.1                 # Gaussian noise level (0.0-1.0)
 -scenario=all                   # Scenario selection
 -graph                          # Generate visualization charts
+-no-aimd                        # Use standard EIP-1559 instead of AIMD
+                                # Sets: alpha=0, beta=1, gamma=1, delta=0, window-size=1
+                                # Cannot be combined with those individual flags
 -help                           # Show detailed help
 ```
 
@@ -282,9 +304,9 @@ go run cmd/simulator/main.go
 
 ### Chart Output
 Generated files include:
-- `chart_[scenario]_[params].png` - AIMD scenario analysis
-- `base_comparison_[start]_[end].png` - Main fee comparison
-- `base_comparison_[start]_[end]_gas.png` - Gas usage analysis
+- `chart_[scenario]_[params].html` - AIMD scenario analysis
+- `base_comparison_[start]_[end].html` - Main fee comparison
+- `base_comparison_[start]_[end]_gas.html` - Gas usage analysis
 
 ## 🧪 Testing and Quality
 
@@ -314,73 +336,18 @@ go test ./pkg/blockchain/
 go test ./pkg/visualization/
 ```
 
-## 📊 Performance Characteristics
-
-### Data Fetching Performance
-- **Small ranges** (10-100 blocks): 2-5 seconds
-- **Medium ranges** (100-1000 blocks): 30-60 seconds
-- **Large ranges** (1000+ blocks): Several minutes with progress tracking
-
-### Chart Generation Speed
-- **AIMD scenarios**: ~0.02s per chart
-- **Base comparisons**: ~0.06s per chart pair
-- **File sizes**: 40-260KB PNG files with professional quality
-
-### Memory Efficiency
-- **Streaming processing** for large datasets
-- **Bounded concurrency** preventing resource exhaustion
-- **Efficient JSON serialization** for data storage
-
-## 🔮 Future Enhancements
-
-### Multi-Chain Support
-- Extend to Ethereum, Polygon, Arbitrum, and other EVM chains
-- Cross-chain fee market comparisons
-- Unified interface for different blockchain clients
-
-### Advanced Analytics
-- MEV analysis from transaction ordering patterns
-- Predictive models with demand forecasting
-- Historical trend analysis with machine learning
-
-### Enhanced Visualization
-- Real-time simulation dashboard with interactive controls
-- Web-based interface for parameter tuning
-- Comparative analysis across multiple configurations
-
-### Performance Optimizations
-- Parallel receipt fetching for improved data collection speed
-- Caching layer for repeated analysis operations
-- Streaming analysis for memory-efficient large dataset processing
-
-## 🤝 Contributing
-
-The modular architecture makes contributing straightforward:
-
-1. **Adding New Scenarios**: Extend `pkg/scenarios/generator.go`
-2. **New Analysis Metrics**: Add to `pkg/analysis/analyzer.go`
-3. **Algorithm Improvements**: Modify `pkg/simulator/fee_adjuster.go`
-4. **Blockchain Support**: Implement new clients in `pkg/blockchain/`
-5. **Visualization Types**: Add chart generators to `pkg/visualization/`
-
-Each package can be developed and tested independently, enabling parallel development and easy code review.
-
 ## 📋 Technical Requirements
 
 ### Dependencies
 - Go 1.23.0 or later
 - Internet connection for blockchain data fetching
-- `go-chart/v2` for professional visualization
+- `go-echarts/v2` for interactive visualization
 - Standard library packages for HTTP, JSON, and mathematical operations
 
 ### System Requirements
 - Memory: 1GB+ for large dataset processing
 - Storage: Variable based on dataset size (typically 1-100MB per dataset)
 - Network: Stable connection for blockchain RPC calls
-
-## 📄 License
-
-This project is provided for educational and research purposes. It's suitable for academic research, protocol development, fee market analysis, and blockchain integration testing.
 
 ## 🎯 Example Output
 
@@ -437,8 +404,8 @@ AIMD vs Actual Comparison:
   → AIMD fees are comparable to actual (within 10%)
 
 Charts generated:
-  - base_comparison_12000000_12001000.png
-  - base_comparison_12000000_12001000_gas.png
+  - base_comparison_12000000_12001000.html
+  - base_comparison_12000000_12001000_gas.html
 ```
 
 This comprehensive simulator provides a powerful platform for researching, testing, and validating AIMD-based fee market mechanisms against both synthetic scenarios and real-world blockchain data.
