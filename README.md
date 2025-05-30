@@ -1,37 +1,8 @@
-# AIMD Fee Market Simulator
+# Fee Market Simulator
 
-A comprehensive implementation of an enhanced **Additive Increase Multiplicative Decrease (AIMD)** variant of the EIP-1559 fee market adjustment mechanism. This simulator provides advanced features including burst capacity, randomness injection, real blockchain data integration, and professional visualization capabilities.
+A comprehensive implementation of an enhanced **Additive Increase Multiplicative Decrease (AIMD)** variant of the EIP-1559 fee market adjustment mechanism. This simulator provides advanced features including burst capacity, randomness injection, real blockchain data integration, and visualization capabilities.
 
-## 🚀 Key Features
-
-### ✨ **Advanced AIMD Algorithm**
-- **Dynamic burst capacity** supporting temporary spikes above target utilization
-- **Adaptive learning rates** with configurable thresholds and constraints
-- **Randomness injection** for realistic testing scenarios
-- **Extended analysis windows** with comprehensive statistical reporting
-- **EIP-1559 compatibility mode** for baseline comparison and standard behavior
-
-### 🔗 **Real Blockchain Integration**
-- **Base blockchain data fetching** with concurrent processing
-- **Accurate transaction analysis** using actual gas consumption data
-- **Transaction dropping simulation** based on fee constraints
-- **Robust retry mechanisms** with exponential backoff and gap detection
-
-### 📊 **Professional Visualization**
-- **Fee evolution charts** with dual-axis visualization
-- **Blockchain comparison charts** showing AIMD vs actual performance
-- **Transaction dropping analysis** with visual overlays
-- **Gas usage analysis** comparing actual vs effective consumption
-
-### 🏗️ **Production-Ready Architecture**
-- **Modular package structure** with clean separation of concerns
-- **Interface-driven design** enabling easy testing and extension
-- **Comprehensive test coverage** across all core functionality
-- **Context-aware operations** with proper timeout and cancellation handling
-
-## 📦 Architecture Overview
-
-The simulator is built with a modular architecture designed for maintainability and extensibility:
+## 📦 Project Overview
 
 ```
 ├── cmd/simulator/          # Application entry point
@@ -41,7 +12,7 @@ The simulator is built with a modular architecture designed for maintainability 
 │   ├── scenarios/          # Simulation scenario generation
 │   ├── analysis/           # Statistical analysis and reporting
 │   ├── blockchain/         # Real blockchain data integration
-│   └── visualization/      # Professional chart generation
+│   └── visualization/      # Chart generation
 └── go.mod
 ```
 
@@ -52,7 +23,7 @@ The simulator is built with a modular architecture designed for maintainability 
 - **`pkg/scenarios`**: Traffic pattern generation for comprehensive testing
 - **`pkg/analysis`**: Statistical analysis with responsiveness scoring
 - **`pkg/blockchain`**: Concurrent blockchain data fetching and simulation
-- **`pkg/visualization`**: Professional chart generation with multiple output formats
+- **`pkg/visualization`**: Chart generation with multiple output formats
 
 ## 🔧 Algorithm Description
 
@@ -193,7 +164,7 @@ go run cmd/simulator/main.go
 # Conservative burst (50% above target)
 ./feemarketsim -burst-multiplier=1.5 -gamma=0.3
 
-# Aggressive burst (300% above target)
+# Aggressive burst (200% above target)
 ./feemarketsim -burst-multiplier=3.0 -gamma=0.1
 
 # Ethereum-like configuration
@@ -267,60 +238,11 @@ go run cmd/simulator/main.go
 - Gradual transitions between states
 - Tests adaptability and responsiveness
 
-## 🔗 Blockchain Integration Features
-
-### High-Performance Data Fetching
-- **Concurrent processing** with configurable worker pools (default: 64 workers)
-- **Exponential backoff retry** with up to 12 attempts per RPC call
-- **Multi-round gap elimination** ensuring complete datasets
-- **Jitter protection** preventing server overload
-- **Context-aware operations** with proper timeout handling
-
-### Accurate Transaction Analysis
-- **Real gas usage** fetched from transaction receipts
-- **Transaction status filtering** excluding failed transactions
-- **Fee-based dropping simulation** based on maxFeePerGas constraints
-- **EIP-1559 and legacy transaction support**
-
-### Real-World Validation
-- **Direct comparison** between AIMD and actual Base fees
-- **Transaction inclusion analysis** with realistic fee thresholds
-- **Gas efficiency metrics** comparing actual vs effective usage
-- **Statistical reporting** with comprehensive performance metrics
-
-## 📈 Visualization Capabilities
-
-### AIMD Fee Evolution Charts
-- **Dual-axis visualization** showing base fees and learning rates
-- **Professional styling** with configurable colors and legends
-- **Utilization analysis** with burst capacity indicators
-- **Gas usage patterns** with proper scaling and units
-
-### Blockchain Comparison Charts
-- **AIMD vs Actual fee comparison** with contrasting visual styles
-- **Transaction dropping analysis** with secondary axis overlays
-- **Gas usage comparison** between actual and effective consumption
-- **Target baseline indicators** for reference comparison
-
 ### Chart Output
 Generated files include:
 - `chart_[scenario]_[params].html` - AIMD scenario analysis
 - `base_comparison_[start]_[end].html` - Main fee comparison
 - `base_comparison_[start]_[end]_gas.html` - Gas usage analysis
-
-## 🧪 Testing and Quality
-
-### Comprehensive Test Coverage
-- **Unit tests** for all core packages with realistic scenarios
-- **Integration tests** for blockchain data fetching and processing
-- **Mock clients** enabling deterministic testing environments
-- **Performance benchmarks** for optimization guidance
-
-### Quality Assurance Features
-- **Interface-driven design** enabling easy mocking and testing
-- **Error handling** with proper context and wrapped errors
-- **Input validation** at all package boundaries
-- **Graceful degradation** with fallback mechanisms
 
 ### Running Tests
 ```bash
@@ -335,77 +257,3 @@ go test ./pkg/simulator/
 go test ./pkg/blockchain/
 go test ./pkg/visualization/
 ```
-
-## 📋 Technical Requirements
-
-### Dependencies
-- Go 1.23.0 or later
-- Internet connection for blockchain data fetching
-- `go-echarts/v2` for interactive visualization
-- Standard library packages for HTTP, JSON, and mathematical operations
-
-### System Requirements
-- Memory: 1GB+ for large dataset processing
-- Storage: Variable based on dataset size (typically 1-100MB per dataset)
-- Network: Stable connection for blockchain RPC calls
-
-## 🎯 Example Output
-
-### AIMD Simulation Results
-```
-================================================================================
-ENHANCED AIMD FEE MARKET SIMULATION RESULTS
-================================================================================
-Scenario: Extended Mixed Traffic Patterns (80 blocks)
-Parameters: γ=0.20, α=0.01, β=0.90, burst=2.0x, randomness=10%
-
-Performance Metrics:
-  Average Base Fee: 1.089 Gwei
-  Fee Range: 1.000 - 1.347 Gwei
-  Final Learning Rate: 0.038
-  Average Learning Rate: 0.085
-  Fee Volatility: 0.067 Gwei
-
-Target Utilization Analysis:
-  Average Utilization: 102.3%
-  Utilization Range: 15.2% - 157.8%
-  Above Target: 52.5% of blocks
-  Responsiveness Score: 0.234
-
-Burst Capacity Usage:
-  Peak Utilization: 157.8% (within 200% burst limit)
-  Burst Events: 12 blocks above 120%
-  Max Single Block: 23.67M gas (target: 15M, limit: 30M)
-```
-
-### Base Blockchain Comparison
-```
-=== Simulating Against Base Blockchain Data ===
-Block Range: 12000000 - 12001000 (1000 blocks)
-Initial Base Fee: 1.250 Gwei
-
-================================================================================
-BASE BLOCKCHAIN SIMULATION RESULTS
-================================================================================
-Transaction Processing:
-  Total Transactions: 124,523
-  Dropped Transactions: 5,216 (4.19%)
-  Effective Utilization: 67.8%
-
-Fee Market Performance:
-  Average Base Fee: 1.89 Gwei
-  Fee Range: 0.95 - 4.12 Gwei
-  Total Gas Processed: 87,534.3 M gas
-
-AIMD vs Actual Comparison:
-  AIMD Average: 1.91 Gwei
-  Actual Average: 1.89 Gwei
-  AIMD/Actual Ratio: 1.01x
-  → AIMD fees are comparable to actual (within 10%)
-
-Charts generated:
-  - base_comparison_12000000_12001000.html
-  - base_comparison_12000000_12001000_gas.html
-```
-
-This comprehensive simulator provides a powerful platform for researching, testing, and validating AIMD-based fee market mechanisms against both synthetic scenarios and real-world blockchain data.
