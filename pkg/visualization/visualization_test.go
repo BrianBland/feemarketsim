@@ -256,3 +256,136 @@ func TestChartOptions(t *testing.T) {
 		t.Error("ChartOptions Title not set correctly")
 	}
 }
+
+func TestGenerateAIMDChartWithLogScale(t *testing.T) {
+	cfg := config.Config{
+		TargetBlockSize:     15000000,
+		InitialBaseFee:      1000000000,
+		MinBaseFee:          1,
+		InitialLearningRate: 0.1,
+		MinLearningRate:     0.001,
+		MaxLearningRate:     0.5,
+		Alpha:               0.01,
+		Beta:                0.9,
+		Delta:               0.000001,
+		Gamma:               0.2,
+		BurstMultiplier:     2.0,
+		WindowSize:          10,
+		RandomnessFactor:    0.0,
+	}
+
+	scenario := scenarios.Scenario{
+		Name:   "Test Scenario Log Scale",
+		Blocks: []uint64{15000000, 20000000, 25000000, 10000000, 5000000},
+	}
+
+	gen := NewGenerator()
+	err := gen.GenerateAIMDChartWithLogScale(cfg, scenario, "test_chart_log.html")
+	if err != nil {
+		t.Fatalf("Failed to generate AIMD chart with log scale: %v", err)
+	}
+
+	// Check if file was created
+	if _, err := os.Stat("test_chart_log.html"); os.IsNotExist(err) {
+		t.Error("Chart file was not created")
+	}
+
+	// Clean up
+	os.Remove("test_chart_log.html")
+}
+
+func TestGenerateBaseComparisonChartWithLogScale(t *testing.T) {
+	cfg := config.Config{
+		TargetBlockSize:     15000000,
+		InitialBaseFee:      1000000000,
+		MinBaseFee:          1,
+		InitialLearningRate: 0.1,
+		MinLearningRate:     0.001,
+		MaxLearningRate:     0.5,
+		Alpha:               0.01,
+		Beta:                0.9,
+		Delta:               0.000001,
+		Gamma:               0.2,
+		BurstMultiplier:     2.0,
+		WindowSize:          10,
+		RandomnessFactor:    0.0,
+	}
+
+	// Create test dataset using the correct structure
+	dataset := &blockchain.DataSet{
+		StartBlock:      100,
+		EndBlock:        102,
+		InitialBaseFee:  1000000000,
+		InitialGasLimit: 30000000,
+		Blocks: []blockchain.BlockData{
+			{
+				Number:        100,
+				GasLimit:      30000000,
+				GasUsed:       15000000,
+				BaseFeePerGas: 1000000000,
+				Transactions: []blockchain.Transaction{
+					{
+						Hash:         "0x123",
+						Gas:          21000,
+						GasUsed:      21000,
+						MaxFeePerGas: 2000000000,
+						Status:       1,
+					},
+				},
+			},
+			{
+				Number:        101,
+				GasLimit:      30000000,
+				GasUsed:       16000000,
+				BaseFeePerGas: 1100000000,
+				Transactions: []blockchain.Transaction{
+					{
+						Hash:         "0x456",
+						Gas:          50000,
+						GasUsed:      45000,
+						MaxFeePerGas: 1500000000,
+						Status:       1,
+					},
+				},
+			},
+			{
+				Number:        102,
+				GasLimit:      30000000,
+				GasUsed:       14000000,
+				BaseFeePerGas: 950000000,
+				Transactions: []blockchain.Transaction{
+					{
+						Hash:         "0x789",
+						Gas:          30000,
+						GasUsed:      28000,
+						MaxFeePerGas: 1200000000,
+						Status:       1,
+					},
+				},
+			},
+		},
+	}
+
+	// Run simulation using the correct simulator
+	simulator := blockchain.NewSimulator(cfg)
+	simResult, err := simulator.SimulateForVisualization(dataset)
+	if err != nil {
+		t.Fatalf("Failed to run simulation: %v", err)
+	}
+
+	gen := NewGenerator()
+	err = gen.GenerateBaseComparisonChartWithLogScale(cfg, dataset, simResult, "test_base_comparison_log.html")
+	if err != nil {
+		t.Fatalf("Failed to generate base comparison chart with log scale: %v", err)
+	}
+
+	// Check if file was created
+	if _, err := os.Stat("test_base_comparison_log.html"); os.IsNotExist(err) {
+		t.Error("Chart file was not created")
+	}
+
+	// Clean up
+	os.Remove("test_base_comparison_log.html")
+	gasFile := strings.Replace("test_base_comparison_log.html", ".html", "_gas.html", 1)
+	os.Remove(gasFile)
+}

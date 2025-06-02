@@ -75,7 +75,11 @@ func main() {
 
 		// Generate charts if requested
 		if simCfg.EnableGraphs {
-			chartGenerator.GenerateChartForScenario(*cfg, scenario)
+			if simCfg.LogScale {
+				chartGenerator.GenerateChartForScenarioWithLogScale(*cfg, scenario)
+			} else {
+				chartGenerator.GenerateChartForScenario(*cfg, scenario)
+			}
 		}
 	}
 
@@ -92,8 +96,14 @@ func main() {
 	if simCfg.EnableGraphs {
 		fmt.Printf("\nVisualization files generated:\n")
 		for _, scenario := range scenariosToRun {
-			filename := fmt.Sprintf("chart_%s.html", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
-			fmt.Printf("  - %s (AIMD fee evolution)\n", filename)
+			scaleType := "linear"
+			suffix := ""
+			if simCfg.LogScale {
+				scaleType = "logarithmic"
+				suffix = "_log"
+			}
+			filename := fmt.Sprintf("chart_%s%s.html", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")), suffix)
+			fmt.Printf("  - %s (AIMD fee evolution - %s scale)\n", filename, scaleType)
 		}
 	}
 }
@@ -114,7 +124,15 @@ func printConfigSummary(cfg config.Config, simCfg config.SimulationConfig) {
 	fmt.Printf("  Initial Learning Rate: %.6f\n", cfg.InitialLearningRate)
 	fmt.Printf("  Randomness Factor: %.1f%%\n", cfg.RandomnessFactor*100)
 	fmt.Printf("  Scenario: %s\n", simCfg.Scenario)
-	fmt.Printf("  Generate Charts: %t\n\n", simCfg.EnableGraphs)
+	fmt.Printf("  Generate Charts: %t\n", simCfg.EnableGraphs)
+	if simCfg.EnableGraphs {
+		scaleType := "linear"
+		if simCfg.LogScale {
+			scaleType = "logarithmic"
+		}
+		fmt.Printf("  Chart Scale: %s\n", scaleType)
+	}
+	fmt.Println()
 }
 
 // runBasicSimulation runs a basic simulation and prints results
@@ -287,10 +305,18 @@ func handleSimulateBase() {
 	// Generate charts if requested
 	if simCfg.EnableGraphs {
 		filename := fmt.Sprintf("base_comparison_%d_%d.html", dataset.StartBlock, dataset.EndBlock)
-		chartGenerator.GenerateBaseComparisonChart(*cfg, dataset, simResult, filename)
+		if simCfg.LogScale {
+			chartGenerator.GenerateBaseComparisonChartWithLogScale(*cfg, dataset, simResult, filename)
+		} else {
+			chartGenerator.GenerateBaseComparisonChart(*cfg, dataset, simResult, filename)
+		}
 
 		fmt.Printf("\nVisualization files generated:\n")
-		fmt.Printf("  - %s (AIMD vs Base fee comparison)\n", filename)
+		scaleType := "linear"
+		if simCfg.LogScale {
+			scaleType = "logarithmic"
+		}
+		fmt.Printf("  - %s (AIMD vs Base fee comparison - %s scale)\n", filename, scaleType)
 		gasFilename := fmt.Sprintf("base_comparison_%d_%d_gas.html", dataset.StartBlock, dataset.EndBlock)
 		fmt.Printf("  - %s (Gas usage analysis)\n", gasFilename)
 	}

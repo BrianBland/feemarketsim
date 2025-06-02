@@ -26,6 +26,7 @@ type Config struct {
 type SimulationConfig struct {
 	Scenario     string
 	EnableGraphs bool
+	LogScale     bool // Use logarithmic scale for Y-axis in charts
 	ShowHelp     bool
 	NoAIMD       bool // Use standard EIP-1559 without AIMD
 }
@@ -81,6 +82,7 @@ func NewParser() *Parser {
 	simConfig := &SimulationConfig{
 		Scenario:     "all",
 		EnableGraphs: false,
+		LogScale:     false,
 		ShowHelp:     false,
 		NoAIMD:       false,
 	}
@@ -114,6 +116,7 @@ func (p *Parser) RegisterFlags() {
 	// Simulation configuration flags
 	p.flagSet.StringVar(&p.simConfig.Scenario, "scenario", p.simConfig.Scenario, "Scenario to run: full, empty, stable, mixed, or all")
 	p.flagSet.BoolVar(&p.simConfig.EnableGraphs, "graph", p.simConfig.EnableGraphs, "Generate visualization charts (HTML files)")
+	p.flagSet.BoolVar(&p.simConfig.LogScale, "log-scale", p.simConfig.LogScale, "Use logarithmic scale for Y-axis in charts")
 	p.flagSet.BoolVar(&p.simConfig.ShowHelp, "help", p.simConfig.ShowHelp, "Show detailed help and parameter explanations")
 	p.flagSet.BoolVar(&p.simConfig.NoAIMD, "no-aimd", p.simConfig.NoAIMD, "Use EIP-1559 instead of AIMD")
 }
@@ -303,6 +306,8 @@ func (p *Parser) ShowDetailedHelp() {
 	fmt.Println("                               - all:    Run all scenarios sequentially")
 	fmt.Println("  -graph                       Generate visualization charts (HTML files)")
 	fmt.Println("                               Creates fee evolution and comparison charts")
+	fmt.Println("  -log-scale                   Use logarithmic scale for Y-axis in charts")
+	fmt.Println("                               Useful when fees span multiple orders of magnitude")
 	fmt.Println("  -no-aimd                     Use EIP-1559 instead of AIMD")
 	fmt.Println("                               Sets: alpha=0, beta=1, gamma=1, delta=0, window-size=1")
 	fmt.Println("                               Cannot be combined with those individual flags")
@@ -314,6 +319,7 @@ func (p *Parser) ShowDetailedHelp() {
 	fmt.Println("Quick Start:")
 	fmt.Println("  feemarketsim                           # Run with default settings")
 	fmt.Println("  feemarketsim -scenario=mixed -graph    # Test mixed traffic with charts")
+	fmt.Println("  feemarketsim -graph -log-scale         # Generate charts with logarithmic scale")
 	fmt.Println("  feemarketsim -no-aimd                  # Use EIP-1559 instead of AIMD")
 	fmt.Println("  feemarketsim -help                     # Show this help")
 	fmt.Println()
@@ -330,6 +336,7 @@ func (p *Parser) ShowDetailedHelp() {
 	fmt.Println("  # Compare AIMD vs EIP-1559")
 	fmt.Println("  feemarketsim -scenario=mixed -graph    # AIMD algorithm")
 	fmt.Println("  feemarketsim -no-aimd -scenario=mixed -graph  # EIP-1559 baseline")
+	fmt.Println("  feemarketsim -scenario=mixed -graph -log-scale # AIMD with log scale")
 	fmt.Println()
 	fmt.Println("  # Test randomness impact")
 	fmt.Println("  feemarketsim -randomness=0.0           # Deterministic")
@@ -344,6 +351,7 @@ func (p *Parser) ShowDetailedHelp() {
 	fmt.Println("  feemarketsim simulate-base analysis.json -graph")
 	fmt.Println("  feemarketsim simulate-base analysis.json -gamma=0.1 -graph")
 	fmt.Println("  feemarketsim simulate-base analysis.json -burst-multiplier=2.5 -graph")
+	fmt.Println("  feemarketsim simulate-base analysis.json -graph -log-scale  # Logarithmic scale")
 	fmt.Println()
 	fmt.Println("  # 3. Performance comparison")
 	fmt.Println("  feemarketsim simulate-base analysis.json -window-size=5    # Fast")

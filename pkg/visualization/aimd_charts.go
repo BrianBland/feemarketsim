@@ -14,6 +14,16 @@ import (
 
 // GenerateAIMDChart creates a comprehensive chart for AIMD simulation results
 func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scenario, filename string) error {
+	return g.GenerateAIMDChartWithOptions(cfg, scenario, filename, false)
+}
+
+// GenerateAIMDChartWithLogScale creates a comprehensive chart for AIMD simulation results with logarithmic Y-axis
+func (g *Generator) GenerateAIMDChartWithLogScale(cfg config.Config, scenario scenarios.Scenario, filename string) error {
+	return g.GenerateAIMDChartWithOptions(cfg, scenario, filename, true)
+}
+
+// GenerateAIMDChartWithOptions creates a comprehensive chart for AIMD simulation results with configurable Y-axis scaling
+func (g *Generator) GenerateAIMDChartWithOptions(cfg config.Config, scenario scenarios.Scenario, filename string, useLogScale bool) error {
 	adjuster := simulator.NewFeeAdjuster(cfg)
 
 	var data ChartData
@@ -33,6 +43,26 @@ func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scen
 	// Create line chart
 	line := charts.NewLine()
 
+	// Determine Y-axis type and additional options
+	yAxisType := "value"
+	var yAxisOpts opts.YAxis
+
+	if useLogScale {
+		yAxisType = "log"
+		// When using log scale, we need to handle zero values and set a minimum
+		// ECharts log scale doesn't handle zero values well, so we set a small minimum
+		yAxisOpts = opts.YAxis{
+			Name: "Base Fee (Gwei) - Log Scale",
+			Type: yAxisType,
+			Min:  1e-6, // Small minimum to avoid log(0) issues
+		}
+	} else {
+		yAxisOpts = opts.YAxis{
+			Name: "Base Fee (Gwei)",
+			Type: yAxisType,
+		}
+	}
+
 	// Set global options
 	line.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
@@ -40,17 +70,19 @@ func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scen
 			Height: "800px",
 		}),
 		charts.WithTitleOpts(opts.Title{
-			Title:    fmt.Sprintf("AIMD Fee Mechanism: %s", scenario.Name),
-			Subtitle: "Base Fee and Learning Rate Analysis",
+			Title: fmt.Sprintf("AIMD Fee Mechanism: %s", scenario.Name),
+			Subtitle: func() string {
+				if useLogScale {
+					return "Base Fee and Learning Rate Analysis - Logarithmic Scale"
+				}
+				return "Base Fee and Learning Rate Analysis"
+			}(),
 		}),
 		charts.WithXAxisOpts(opts.XAxis{
 			Name: "Block Number",
 			Type: "value",
 		}),
-		charts.WithYAxisOpts(opts.YAxis{
-			Name: "Base Fee (Gwei)",
-			Type: "value",
-		}),
+		charts.WithYAxisOpts(yAxisOpts),
 		charts.WithLegendOpts(opts.Legend{
 			Show: opts.Bool(true),
 			Top:  "10%",
@@ -84,9 +116,15 @@ func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scen
 	)
 
 	// Prepare data for line series with [x, y] coordinate pairs
-	baseFeeData := make([]opts.LineData, len(data.BaseFees))
+	// When using log scale, we need to handle zero/negative values
+	baseFeeData := make([]opts.LineData, 0, len(data.BaseFees))
 	for i, fee := range data.BaseFees {
-		baseFeeData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], fee}}
+		// For log scale, replace zero or negative values with a small positive number
+		displayFee := fee
+		if useLogScale && fee <= 0 {
+			displayFee = 1e-9 // Very small value instead of zero
+		}
+		baseFeeData = append(baseFeeData, opts.LineData{Value: []interface{}{data.BlockNumbers[i], displayFee}})
 	}
 
 	learningRateData := make([]opts.LineData, len(data.LearningRates))
@@ -126,7 +164,11 @@ func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scen
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
-	fmt.Printf("Interactive chart saved to %s\n", filename)
+	scaleType := "linear"
+	if useLogScale {
+		scaleType = "logarithmic"
+	}
+	fmt.Printf("Interactive chart (%s scale) saved to %s\n", scaleType, filename)
 	return nil
 }
 
@@ -137,5 +179,15 @@ func (g *Generator) GenerateChartForScenario(cfg config.Config, scenario scenari
 
 	if err := g.GenerateAIMDChart(cfg, scenario, filename); err != nil {
 		fmt.Printf("Warning: failed to generate chart for %s: %v\n", scenario.Name, err)
+	}
+}
+
+// GenerateChartForScenarioWithLogScale creates a chart with log scale for a given scenario
+func (g *Generator) GenerateChartForScenarioWithLogScale(cfg config.Config, scenario scenarios.Scenario) {
+	// Create filename based on scenario name - use .html extension for interactive charts
+	filename := fmt.Sprintf("chart_%s_log.html", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
+
+	if err := g.GenerateAIMDChartWithLogScale(cfg, scenario, filename); err != nil {
+		fmt.Printf("Warning: failed to generate log scale chart for %s: %v\n", scenario.Name, err)
 	}
 }

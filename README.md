@@ -107,12 +107,16 @@ go run cmd/simulator/main.go
 # Generate visualization charts
 ./feemarketsim -scenario=stable -graph
 
+# Generate charts with logarithmic Y-axis scaling
+./feemarketsim -scenario=mixed -graph -log-scale
+
 # Use standard EIP-1559 instead of AIMD
 ./feemarketsim -no-aimd
 
 # Compare AIMD vs EIP-1559 behavior
 ./feemarketsim -scenario=mixed -graph                    # AIMD algorithm
 ./feemarketsim -no-aimd -scenario=mixed -graph           # EIP-1559 baseline
+./feemarketsim -scenario=mixed -graph -log-scale         # AIMD with log scale
 
 # Custom parameter testing
 ./feemarketsim -gamma=0.1 -alpha=0.02 -burst-multiplier=2.5
@@ -151,6 +155,9 @@ go run cmd/simulator/main.go
 
 # With custom parameters and visualization
 ./feemarketsim simulate-base base_data.json -graph -gamma=0.1 -alpha=0.02
+
+# With logarithmic scale for large fee ranges
+./feemarketsim simulate-base base_data.json -graph -log-scale
 
 # Conservative vs aggressive comparison
 ./feemarketsim simulate-base base_data.json -gamma=0.5 -beta=0.95  # Conservative
@@ -210,6 +217,7 @@ go run cmd/simulator/main.go
 -randomness=0.1                 # Gaussian noise level (0.0-1.0)
 -scenario=all                   # Scenario selection
 -graph                          # Generate visualization charts
+-log-scale                      # Use logarithmic scale for Y-axis in charts
 -no-aimd                        # Use standard EIP-1559 instead of AIMD
                                 # Sets: alpha=0, beta=1, gamma=1, delta=0, window-size=1
                                 # Cannot be combined with those individual flags

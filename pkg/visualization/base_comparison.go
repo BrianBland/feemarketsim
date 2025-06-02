@@ -13,6 +13,16 @@ import (
 
 // GenerateBaseComparisonChart creates a comparison chart between Base and AIMD mechanisms
 func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string) error {
+	return g.GenerateBaseComparisonChartWithOptions(cfg, dataset, simResult, filename, false)
+}
+
+// GenerateBaseComparisonChartWithLogScale creates a comparison chart with logarithmic Y-axis
+func (g *Generator) GenerateBaseComparisonChartWithLogScale(cfg config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string) error {
+	return g.GenerateBaseComparisonChartWithOptions(cfg, dataset, simResult, filename, true)
+}
+
+// GenerateBaseComparisonChartWithOptions creates a comparison chart between Base and AIMD mechanisms with configurable Y-axis scaling
+func (g *Generator) GenerateBaseComparisonChartWithOptions(cfg config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string, useLogScale bool) error {
 	if simResult.ComparisonData == nil {
 		return fmt.Errorf("simulation did not collect visualization data")
 	}
@@ -22,6 +32,26 @@ func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *bloc
 	// Create line chart for comparison
 	line := charts.NewLine()
 
+	// Determine Y-axis type and additional options
+	yAxisType := "value"
+	var yAxisOpts opts.YAxis
+
+	if useLogScale {
+		yAxisType = "log"
+		// When using log scale, we need to handle zero values and set a minimum
+		// ECharts log scale doesn't handle zero values well, so we set a small minimum
+		yAxisOpts = opts.YAxis{
+			Name: "Base Fee (Gwei) - Log Scale",
+			Type: yAxisType,
+			Min:  1e-6, // Small minimum to avoid log(0) issues
+		}
+	} else {
+		yAxisOpts = opts.YAxis{
+			Name: "Base Fee (Gwei)",
+			Type: yAxisType,
+		}
+	}
+
 	// Set global options
 	line.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
@@ -29,17 +59,19 @@ func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *bloc
 			Height: "1000px",
 		}),
 		charts.WithTitleOpts(opts.Title{
-			Title:    fmt.Sprintf("Base vs AIMD Fee Comparison (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
-			Subtitle: "Fee Mechanism Comparison Analysis",
+			Title: fmt.Sprintf("Base vs AIMD Fee Comparison (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
+			Subtitle: func() string {
+				if useLogScale {
+					return "Fee Mechanism Comparison Analysis - Logarithmic Scale"
+				}
+				return "Fee Mechanism Comparison Analysis"
+			}(),
 		}),
 		charts.WithXAxisOpts(opts.XAxis{
 			Name: "Block Number",
 			Type: "value",
 		}),
-		charts.WithYAxisOpts(opts.YAxis{
-			Name: "Base Fee (Gwei)",
-			Type: "value",
-		}),
+		charts.WithYAxisOpts(yAxisOpts),
 		charts.WithLegendOpts(opts.Legend{
 			Show: opts.Bool(true),
 			Top:  "10%",
@@ -73,14 +105,25 @@ func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *bloc
 	)
 
 	// Prepare data for line series with [x, y] coordinate pairs
-	actualBaseFeeData := make([]opts.LineData, len(data.ActualBaseFees))
+	// When using log scale, we need to handle zero/negative values
+	actualBaseFeeData := make([]opts.LineData, 0, len(data.ActualBaseFees))
 	for i, fee := range data.ActualBaseFees {
-		actualBaseFeeData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], fee}}
+		// For log scale, replace zero or negative values with a small positive number
+		displayFee := fee
+		if useLogScale && fee <= 0 {
+			displayFee = 1e-9 // Very small value instead of zero
+		}
+		actualBaseFeeData = append(actualBaseFeeData, opts.LineData{Value: []interface{}{data.BlockNumbers[i], displayFee}})
 	}
 
-	aimdBaseFeeData := make([]opts.LineData, len(data.AIMDBaseFees))
+	aimdBaseFeeData := make([]opts.LineData, 0, len(data.AIMDBaseFees))
 	for i, fee := range data.AIMDBaseFees {
-		aimdBaseFeeData[i] = opts.LineData{Value: []interface{}{data.BlockNumbers[i], fee}}
+		// For log scale, replace zero or negative values with a small positive number
+		displayFee := fee
+		if useLogScale && fee <= 0 {
+			displayFee = 1e-9 // Very small value instead of zero
+		}
+		aimdBaseFeeData = append(aimdBaseFeeData, opts.LineData{Value: []interface{}{data.BlockNumbers[i], displayFee}})
 	}
 
 	droppedPercentageData := make([]opts.LineData, len(data.DroppedPercentages))
@@ -130,7 +173,11 @@ func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *bloc
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
-	fmt.Printf("Base comparison chart saved to %s\n", filename)
+	scaleType := "linear"
+	if useLogScale {
+		scaleType = "logarithmic"
+	}
+	fmt.Printf("Base comparison chart (%s scale) saved to %s\n", scaleType, filename)
 
 	// Also generate a detailed gas usage comparison
 	gasFilename := strings.Replace(filename, ".html", "_gas.html", 1)
