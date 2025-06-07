@@ -19,12 +19,12 @@ type ChartData struct {
 
 // ChartGenerator defines the interface for generating charts
 type ChartGenerator interface {
-	GenerateAIMDChart(config config.Config, scenario scenarios.Scenario, filename string) error
-	GenerateAIMDChartWithLogScale(config config.Config, scenario scenarios.Scenario, filename string) error
-	GenerateBaseComparisonChart(config config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string) error
-	GenerateBaseComparisonChartWithLogScale(config config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string) error
+	GenerateChart(config config.Config, scenario scenarios.Scenario, filename string) error
+	GenerateChartWithLogScale(config config.Config, scenario scenarios.Scenario, filename string) error
 	GenerateChartForScenario(config config.Config, scenario scenarios.Scenario)
 	GenerateChartForScenarioWithLogScale(config config.Config, scenario scenarios.Scenario)
+	GenerateBaseComparisonChart(config config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string) error
+	GenerateBaseComparisonChartWithLogScale(config config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string) error
 }
 
 // Generator implements ChartGenerator interface

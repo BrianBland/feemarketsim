@@ -44,15 +44,21 @@ func NewAnalyzer(cfg config.Config) *Analyzer {
 
 // RunDetailedAnalysis runs a simulation and provides comprehensive analysis
 func (a *Analyzer) RunDetailedAnalysis(scenario scenarios.Scenario) Result {
-	adjuster := simulator.NewFeeAdjuster(a.config)
+	adjusterType, err := simulator.ParseAdjusterType(a.config.Simulation.AdjusterType)
+	if err != nil {
+		panic(err)
+	}
+	adjuster, err := simulator.NewAdjusterFactory().CreateAdjusterWithConfigs(adjusterType, &a.config)
+	if err != nil {
+		panic(err)
+	}
 
 	var (
-		baseFees           []uint64
-		learningRates      []float64
-		targetUtilizations []float64
-		burstUtilizations  []float64
-		gasUsages          []uint64
-		targetDeviations   []float64
+		baseFees          []uint64
+		learningRates     []float64
+		burstUtilizations []float64
+		gasUsages         []uint64
+		targetDeviations  []float64
 	)
 
 	for _, gasUsed := range scenario.Blocks {
@@ -61,7 +67,6 @@ func (a *Analyzer) RunDetailedAnalysis(scenario scenarios.Scenario) Result {
 
 		baseFees = append(baseFees, state.BaseFee)
 		learningRates = append(learningRates, state.LearningRate)
-		targetUtilizations = append(targetUtilizations, state.TargetUtilization)
 		burstUtilizations = append(burstUtilizations, state.BurstUtilization)
 		gasUsages = append(gasUsages, gasUsed)
 

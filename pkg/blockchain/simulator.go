@@ -12,12 +12,16 @@ import (
 
 // Simulator handles simulation against real blockchain data
 type Simulator struct {
-	config config.Config
+	config       config.Config
+	adjusterType simulator.AdjusterType
 }
 
 // NewSimulator creates a new blockchain simulator
-func NewSimulator(cfg config.Config) *Simulator {
-	return &Simulator{config: cfg}
+func NewSimulator(cfg config.Config, adjusterType simulator.AdjusterType) *Simulator {
+	return &Simulator{
+		config:       cfg,
+		adjusterType: adjusterType,
+	}
 }
 
 // SimulateAgainstDataSet runs the AIMD mechanism against real blockchain data
@@ -41,7 +45,13 @@ func (s *Simulator) SimulateAgainstDataSetWithOptions(dataset *DataSet, collectV
 	adjustedConfig.InitialBaseFee = dataset.InitialBaseFee
 	adjustedConfig.TargetBlockSize = dataset.InitialGasLimit / 2
 
-	adjuster := simulator.NewFeeAdjuster(adjustedConfig)
+	// Create fee adjuster using factory
+	factory := simulator.NewAdjusterFactory()
+	adjuster, err := factory.CreateAdjusterWithConfigs(s.adjusterType, &adjustedConfig)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create fee adjuster: %w", err)
+	}
 
 	var (
 		totalTx   int
@@ -56,7 +66,7 @@ func (s *Simulator) SimulateAgainstDataSetWithOptions(dataset *DataSet, collectV
 		compData = &ComparisonData{
 			BlockNumbers:       make([]float64, 0, len(dataset.Blocks)),
 			ActualBaseFees:     make([]float64, 0, len(dataset.Blocks)),
-			AIMDBaseFees:       make([]float64, 0, len(dataset.Blocks)),
+			SimulatedBaseFees:  make([]float64, 0, len(dataset.Blocks)),
 			DroppedPercentages: make([]float64, 0, len(dataset.Blocks)),
 			ActualGasUsages:    make([]float64, 0, len(dataset.Blocks)),
 			EffectiveGasUsages: make([]float64, 0, len(dataset.Blocks)),
@@ -90,7 +100,7 @@ func (s *Simulator) SimulateAgainstDataSetWithOptions(dataset *DataSet, collectV
 
 			compData.BlockNumbers = append(compData.BlockNumbers, float64(i+1))
 			compData.ActualBaseFees = append(compData.ActualBaseFees, float64(block.BaseFeePerGas)/1e9)
-			compData.AIMDBaseFees = append(compData.AIMDBaseFees, float64(state.BaseFee)/1e9)
+			compData.SimulatedBaseFees = append(compData.SimulatedBaseFees, float64(state.BaseFee)/1e9)
 			compData.DroppedPercentages = append(compData.DroppedPercentages, droppedPercentage)
 			compData.ActualGasUsages = append(compData.ActualGasUsages, float64(block.GasUsed)/1e6)
 			compData.EffectiveGasUsages = append(compData.EffectiveGasUsages, float64(effectiveGasUsed)/1e6)
@@ -256,10 +266,10 @@ func (s *Simulator) maxUint64(values []uint64) uint64 {
 	return max
 }
 
-// CompareWithActualBaseFees compares AIMD results with actual Base blockchain fees
+// CompareWithActualBaseFees compares simulated results with actual Base blockchain fees
 func (s *Simulator) CompareWithActualBaseFees(dataset *DataSet, simResult *SimulationResult) {
 	fmt.Printf("\n" + strings.Repeat("=", 60) + "\n")
-	fmt.Printf("AIMD vs ACTUAL BASE FEES COMPARISON\n")
+	fmt.Printf("SIMULATED vs ACTUAL BASE FEES COMPARISON\n")
 	fmt.Printf(strings.Repeat("=", 60) + "\n")
 
 	// Calculate statistics for actual Base fees
@@ -276,19 +286,19 @@ func (s *Simulator) CompareWithActualBaseFees(dataset *DataSet, simResult *Simul
 	fmt.Printf("  Average: %.3f Gwei\n", actualAvg/1e9)
 	fmt.Printf("  Range: %.3f - %.3f Gwei\n", float64(actualMin)/1e9, float64(actualMax)/1e9)
 
-	fmt.Printf("\nAIMD Simulation Results:\n")
+	fmt.Printf("\nSimulation Results:\n")
 	fmt.Printf("  Average: %.3f Gwei\n", float64(simResult.AvgBaseFee)/1e9)
 	fmt.Printf("  Range: %.3f - %.3f Gwei\n", float64(simResult.MinBaseFee)/1e9, float64(simResult.MaxBaseFee)/1e9)
 
 	fmt.Printf("\nComparison:\n")
 	avgRatio := float64(simResult.AvgBaseFee) / actualAvg
-	fmt.Printf("  AIMD/Actual Average Ratio: %.3fx\n", avgRatio)
+	fmt.Printf("  Simulated/Actual Average Ratio: %.3fx\n", avgRatio)
 
 	if avgRatio > 1.1 {
-		fmt.Printf("  → AIMD fees are %.1f%% higher than actual\n", (avgRatio-1)*100)
+		fmt.Printf("  → Simulated fees are %.1f%% higher than actual\n", (avgRatio-1)*100)
 	} else if avgRatio < 0.9 {
-		fmt.Printf("  → AIMD fees are %.1f%% lower than actual\n", (1-avgRatio)*100)
+		fmt.Printf("  → Simulated fees are %.1f%% lower than actual\n", (1-avgRatio)*100)
 	} else {
-		fmt.Printf("  → AIMD fees are comparable to actual (within 10%%)\n")
+		fmt.Printf("  → Simulated fees are comparable to actual (within 10%%)\n")
 	}
 }

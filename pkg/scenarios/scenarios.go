@@ -2,6 +2,7 @@ package scenarios
 
 import (
 	"github.com/brianbland/feemarketsim/pkg/config"
+	"github.com/brianbland/feemarketsim/pkg/randomizer"
 	"github.com/brianbland/feemarketsim/pkg/simulator"
 )
 
@@ -14,13 +15,17 @@ type Scenario struct {
 
 // Generator handles scenario generation
 type Generator struct {
-	adjuster *simulator.FeeAdjuster
+	adjuster   simulator.FeeAdjuster
+	randomizer randomizer.Randomizer
 }
 
 // NewGenerator creates a new scenario generator
-func NewGenerator(cfg config.Config) *Generator {
+func NewGenerator(simCfg config.SimulationConfig) *Generator {
+	gaussianNoise := randomizer.NewGaussianNoise(simCfg.Randomizer.Seed, simCfg.Randomizer.GaussianNoise)
+	burstRandomizer := randomizer.NewBurstRandomizer(simCfg.Randomizer.Seed, simCfg.Randomizer.BurstProbability, simCfg.Randomizer.BurstDurationMin, simCfg.Randomizer.BurstDurationMax, simCfg.Randomizer.BurstIntensity)
 	return &Generator{
-		adjuster: simulator.NewFeeAdjuster(cfg),
+		adjuster:   simulator.NewAIMDFeeAdjuster(simulator.DefaultAIMDConfig()),
+		randomizer: randomizer.NewCompoundRandomizer(gaussianNoise, burstRandomizer),
 	}
 }
 
@@ -33,11 +38,8 @@ func (g *Generator) GenerateAll(cfg config.Config) map[string]Scenario {
 		"mixed":  g.generateMixedTraffic(cfg),
 	}
 
-	// Apply randomness if configured
-	if cfg.RandomnessFactor > 0 {
-		for key, scenario := range scenarios {
-			scenarios[key] = g.applyRandomness(scenario)
-		}
+	for key, scenario := range scenarios {
+		scenarios[key] = g.applyRandomness(scenario)
 	}
 
 	return scenarios
@@ -138,7 +140,7 @@ func (g *Generator) generateMixedTraffic(cfg config.Config) Scenario {
 func (g *Generator) applyRandomness(scenario Scenario) Scenario {
 	randomizedBlocks := make([]uint64, len(scenario.Blocks))
 	for i, gasUsed := range scenario.Blocks {
-		randomizedBlocks[i] = g.adjuster.AddRandomness(gasUsed)
+		randomizedBlocks[i] = g.randomizer.AddRandomness(gasUsed, g.adjuster.GetMaxBlockSize())
 	}
 
 	return Scenario{

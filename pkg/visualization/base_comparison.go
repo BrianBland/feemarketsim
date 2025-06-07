@@ -11,7 +11,7 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
-// GenerateBaseComparisonChart creates a comparison chart between Base and AIMD mechanisms
+// GenerateBaseComparisonChart creates a comparison chart between Base and simulated mechanisms
 func (g *Generator) GenerateBaseComparisonChart(cfg config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string) error {
 	return g.GenerateBaseComparisonChartWithOptions(cfg, dataset, simResult, filename, false)
 }
@@ -21,7 +21,7 @@ func (g *Generator) GenerateBaseComparisonChartWithLogScale(cfg config.Config, d
 	return g.GenerateBaseComparisonChartWithOptions(cfg, dataset, simResult, filename, true)
 }
 
-// GenerateBaseComparisonChartWithOptions creates a comparison chart between Base and AIMD mechanisms with configurable Y-axis scaling
+// GenerateBaseComparisonChartWithOptions creates a comparison chart between Base and simulated mechanisms with configurable Y-axis scaling
 func (g *Generator) GenerateBaseComparisonChartWithOptions(cfg config.Config, dataset *blockchain.DataSet, simResult *blockchain.SimulationResult, filename string, useLogScale bool) error {
 	if simResult.ComparisonData == nil {
 		return fmt.Errorf("simulation did not collect visualization data")
@@ -59,7 +59,7 @@ func (g *Generator) GenerateBaseComparisonChartWithOptions(cfg config.Config, da
 			Height: "1000px",
 		}),
 		charts.WithTitleOpts(opts.Title{
-			Title: fmt.Sprintf("Base vs AIMD Fee Comparison (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
+			Title: fmt.Sprintf("Base vs Simulated Fee Comparison (Blocks %d-%d)", dataset.StartBlock, dataset.EndBlock),
 			Subtitle: func() string {
 				if useLogScale {
 					return "Fee Mechanism Comparison Analysis - Logarithmic Scale"
@@ -116,14 +116,14 @@ func (g *Generator) GenerateBaseComparisonChartWithOptions(cfg config.Config, da
 		actualBaseFeeData = append(actualBaseFeeData, opts.LineData{Value: []interface{}{data.BlockNumbers[i], displayFee}})
 	}
 
-	aimdBaseFeeData := make([]opts.LineData, 0, len(data.AIMDBaseFees))
-	for i, fee := range data.AIMDBaseFees {
+	simulatedBaseFeeData := make([]opts.LineData, 0, len(data.SimulatedBaseFees))
+	for i, fee := range data.SimulatedBaseFees {
 		// For log scale, replace zero or negative values with a small positive number
 		displayFee := fee
 		if useLogScale && fee <= 0 {
 			displayFee = 1e-9 // Very small value instead of zero
 		}
-		aimdBaseFeeData = append(aimdBaseFeeData, opts.LineData{Value: []interface{}{data.BlockNumbers[i], displayFee}})
+		simulatedBaseFeeData = append(simulatedBaseFeeData, opts.LineData{Value: []interface{}{data.BlockNumbers[i], displayFee}})
 	}
 
 	droppedPercentageData := make([]opts.LineData, len(data.DroppedPercentages))
@@ -140,7 +140,7 @@ func (g *Generator) GenerateBaseComparisonChartWithOptions(cfg config.Config, da
 			Width: 3,
 		}),
 	).
-		AddSeries("AIMD Fees", aimdBaseFeeData,
+		AddSeries("Simulated Fees", simulatedBaseFeeData,
 			charts.WithLineChartOpts(opts.LineChart{
 				Smooth: opts.Bool(true),
 			}),

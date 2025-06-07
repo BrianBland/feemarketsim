@@ -8,7 +8,8 @@ import (
 
 func TestNewFeeAdjuster(t *testing.T) {
 	cfg := config.Default()
-	adjuster := NewFeeAdjuster(cfg)
+	aimdConfig := DefaultAIMDConfig()
+	adjuster := NewAIMDFeeAdjuster(aimdConfig)
 
 	if adjuster == nil {
 		t.Fatal("NewFeeAdjuster returned nil")
@@ -19,19 +20,18 @@ func TestNewFeeAdjuster(t *testing.T) {
 		t.Errorf("Expected initial base fee %d, got %d", cfg.InitialBaseFee, state.BaseFee)
 	}
 
-	if state.LearningRate != cfg.InitialLearningRate {
-		t.Errorf("Expected initial learning rate %f, got %f", cfg.InitialLearningRate, state.LearningRate)
+	if state.LearningRate != aimdConfig.InitialLearningRate {
+		t.Errorf("Expected initial learning rate %f, got %f", aimdConfig.InitialLearningRate, state.LearningRate)
 	}
 }
 
 func TestProcessBlock(t *testing.T) {
 	cfg := config.Default()
-	adjuster := NewFeeAdjuster(cfg)
+	aimdConfig := DefaultAIMDConfig()
+	adjuster := NewAIMDFeeAdjuster(aimdConfig)
 
-	// Set deterministic seed for reproducible tests
-	adjuster.SetSeed(12345)
-
-	initialBaseFee := adjuster.baseFee
+	initialState := adjuster.GetCurrentState()
+	initialBaseFee := initialState.BaseFee
 
 	// Process a block with target gas usage
 	adjuster.ProcessBlock(cfg.TargetBlockSize)
@@ -49,7 +49,7 @@ func TestProcessBlock(t *testing.T) {
 	}
 
 	// Test with full window
-	for i := 0; i < cfg.WindowSize; i++ {
+	for i := 0; i < aimdConfig.WindowSize; i++ {
 		adjuster.ProcessBlock(cfg.TargetBlockSize * 2) // High usage
 	}
 
@@ -62,42 +62,10 @@ func TestProcessBlock(t *testing.T) {
 	}
 }
 
-func TestAddRandomness(t *testing.T) {
-	cfg := config.Default()
-	cfg.RandomnessFactor = 0.1
-	adjuster := NewFeeAdjuster(cfg)
-	adjuster.SetSeed(12345) // Deterministic for testing
-
-	gasUsed := uint64(1000000)
-
-	// With randomness, results should vary
-	result1 := adjuster.AddRandomness(gasUsed)
-	result2 := adjuster.AddRandomness(gasUsed)
-
-	// Results should be different (with high probability)
-	if result1 == result2 {
-		t.Log("Warning: Randomness produced same result twice (low probability event)")
-	}
-
-	// Results should be within reasonable bounds
-	maxAllowed := adjuster.GetMaxBlockSize()
-	if result1 > maxAllowed || result2 > maxAllowed {
-		t.Errorf("Randomness produced result exceeding max block size")
-	}
-
-	// Test with zero randomness
-	cfg.RandomnessFactor = 0
-	adjuster2 := NewFeeAdjuster(cfg)
-	result3 := adjuster2.AddRandomness(gasUsed)
-
-	if result3 != gasUsed {
-		t.Errorf("Expected no randomness to return original value %d, got %d", gasUsed, result3)
-	}
-}
-
 func TestReset(t *testing.T) {
 	cfg := config.Default()
-	adjuster := NewFeeAdjuster(cfg)
+	aimdConfig := DefaultAIMDConfig()
+	adjuster := NewAIMDFeeAdjuster(aimdConfig)
 
 	// Process some blocks
 	for i := 0; i < 5; i++ {
@@ -123,7 +91,116 @@ func TestReset(t *testing.T) {
 		t.Errorf("Expected base fee reset to %d, got %d", cfg.InitialBaseFee, state.BaseFee)
 	}
 
-	if state.LearningRate != cfg.InitialLearningRate {
-		t.Errorf("Expected learning rate reset to %f, got %f", cfg.InitialLearningRate, state.LearningRate)
+	if state.LearningRate != aimdConfig.InitialLearningRate {
+		t.Errorf("Expected learning rate reset to %f, got %f", aimdConfig.InitialLearningRate, state.LearningRate)
+	}
+}
+
+// Test different adjuster types to ensure the interface works correctly
+func TestAdjusterTypes(t *testing.T) {
+	cfg := config.Default()
+	factory := NewAdjusterFactory()
+
+	tests := []struct {
+		name         string
+		adjusterType AdjusterType
+	}{
+		{"AIMD", AdjusterTypeAIMD},
+		{"EIP1559", AdjusterTypeEIP1559},
+		{"PID", AdjusterTypePID},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			adjuster, err := factory.CreateAdjuster(tt.adjusterType, cfg)
+			if err != nil {
+				t.Fatalf("Failed to create %s adjuster: %v", tt.name, err)
+			}
+
+			// Test basic interface methods
+			state := adjuster.GetCurrentState()
+			if state.BaseFee == 0 {
+				t.Errorf("%s adjuster has zero initial base fee", tt.name)
+			}
+
+			maxBlockSize := adjuster.GetMaxBlockSize()
+			if maxBlockSize == 0 {
+				t.Errorf("%s adjuster has zero max block size", tt.name)
+			}
+
+			// Test processing a block
+			adjuster.ProcessBlock(cfg.TargetBlockSize)
+			blocks := adjuster.GetBlocks()
+			if len(blocks) != 1 {
+				t.Errorf("%s adjuster: expected 1 block after processing, got %d", tt.name, len(blocks))
+			}
+
+			// Test reset
+			adjuster.Reset()
+			blocksAfterReset := adjuster.GetBlocks()
+			if len(blocksAfterReset) != 0 {
+				t.Errorf("%s adjuster: expected 0 blocks after reset, got %d", tt.name, len(blocksAfterReset))
+			}
+		})
+	}
+}
+
+// Test factory with specific configurations
+func TestFactoryWithConfigs(t *testing.T) {
+	baseConfig := config.Default()
+	factory := NewAdjusterFactory()
+
+	// Create adjuster configs
+	adjusterConfigs := &baseConfig.Adjuster
+
+	// Set AIMD config
+	adjusterConfigs.AIMD.Gamma = 0.25
+	adjusterConfigs.AIMD.InitialLearningRate = 0.1
+	adjusterConfigs.AIMD.MaxLearningRate = 0.5
+	adjusterConfigs.AIMD.MinLearningRate = 0.001
+	adjusterConfigs.AIMD.Alpha = 0.005
+	adjusterConfigs.AIMD.Beta = 0.95
+	adjusterConfigs.AIMD.Delta = 0
+
+	// Set EIP-1559 config
+	adjusterConfigs.EIP1559.MaxFeeChange = 0.2
+
+	// Set PID config
+	adjusterConfigs.PID.Kp = 0.15
+	adjusterConfigs.PID.Ki = 0.02
+	adjusterConfigs.PID.Kd = 0.06
+
+	tests := []struct {
+		name         string
+		adjusterType AdjusterType
+	}{
+		{"AIMD with configs", AdjusterTypeAIMD},
+		{"EIP1559 with configs", AdjusterTypeEIP1559},
+		{"PID with configs", AdjusterTypePID},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			adjuster, err := factory.CreateAdjusterWithConfigs(tt.adjusterType, &baseConfig)
+			if err != nil {
+				t.Fatalf("Failed to create %s adjuster with configs: %v", tt.name, err)
+			}
+
+			// Verify it works
+			state := adjuster.GetCurrentState()
+			if state.BaseFee == 0 {
+				t.Errorf("%s adjuster has zero initial base fee", tt.name)
+			}
+
+			// Process a few blocks
+			for i := 0; i < 3; i++ {
+				adjuster.ProcessBlock(baseConfig.TargetBlockSize)
+			}
+
+			blocks := adjuster.GetBlocks()
+			if len(blocks) != 3 {
+				t.Errorf("%s adjuster: expected 3 blocks, got %d", tt.name, len(blocks))
+			}
+		})
 	}
 }

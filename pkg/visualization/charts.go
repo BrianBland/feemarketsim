@@ -12,19 +12,27 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
-// GenerateAIMDChart creates a comprehensive chart for AIMD simulation results
-func (g *Generator) GenerateAIMDChart(cfg config.Config, scenario scenarios.Scenario, filename string) error {
-	return g.GenerateAIMDChartWithOptions(cfg, scenario, filename, false)
+// GenerateChart creates a comprehensive chart for simulation results
+func (g *Generator) GenerateChart(cfg config.Config, scenario scenarios.Scenario, filename string) error {
+	return g.GenerateChartWithOptions(cfg, scenario, filename, false)
 }
 
-// GenerateAIMDChartWithLogScale creates a comprehensive chart for AIMD simulation results with logarithmic Y-axis
-func (g *Generator) GenerateAIMDChartWithLogScale(cfg config.Config, scenario scenarios.Scenario, filename string) error {
-	return g.GenerateAIMDChartWithOptions(cfg, scenario, filename, true)
+// GenerateChartWithLogScale creates a comprehensive chart for simulation results with logarithmic Y-axis
+func (g *Generator) GenerateChartWithLogScale(cfg config.Config, scenario scenarios.Scenario, filename string) error {
+	return g.GenerateChartWithOptions(cfg, scenario, filename, true)
 }
 
-// GenerateAIMDChartWithOptions creates a comprehensive chart for AIMD simulation results with configurable Y-axis scaling
-func (g *Generator) GenerateAIMDChartWithOptions(cfg config.Config, scenario scenarios.Scenario, filename string, useLogScale bool) error {
-	adjuster := simulator.NewFeeAdjuster(cfg)
+// GenerateChartWithOptions creates a comprehensive chart for simulation results with configurable Y-axis scaling
+func (g *Generator) GenerateChartWithOptions(cfg config.Config, scenario scenarios.Scenario, filename string, useLogScale bool) error {
+	adjusterType, err := simulator.ParseAdjusterType(cfg.Simulation.AdjusterType)
+	if err != nil {
+		fmt.Printf("Error: Invalid adjuster type: %v\n", err)
+		return err
+	}
+	adjuster, err := simulator.NewAdjusterFactory().CreateAdjusterWithConfigs(adjusterType, &cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create adjuster: %w", err)
+	}
 
 	var data ChartData
 
@@ -70,7 +78,7 @@ func (g *Generator) GenerateAIMDChartWithOptions(cfg config.Config, scenario sce
 			Height: "800px",
 		}),
 		charts.WithTitleOpts(opts.Title{
-			Title: fmt.Sprintf("AIMD Fee Mechanism: %s", scenario.Name),
+			Title: fmt.Sprintf("Simulated Fee Mechanism: %s", scenario.Name),
 			Subtitle: func() string {
 				if useLogScale {
 					return "Base Fee and Learning Rate Analysis - Logarithmic Scale"
@@ -177,7 +185,7 @@ func (g *Generator) GenerateChartForScenario(cfg config.Config, scenario scenari
 	// Create filename based on scenario name - use .html extension for interactive charts
 	filename := fmt.Sprintf("chart_%s.html", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
 
-	if err := g.GenerateAIMDChart(cfg, scenario, filename); err != nil {
+	if err := g.GenerateChart(cfg, scenario, filename); err != nil {
 		fmt.Printf("Warning: failed to generate chart for %s: %v\n", scenario.Name, err)
 	}
 }
@@ -187,7 +195,7 @@ func (g *Generator) GenerateChartForScenarioWithLogScale(cfg config.Config, scen
 	// Create filename based on scenario name - use .html extension for interactive charts
 	filename := fmt.Sprintf("chart_%s_log.html", strings.ToLower(strings.ReplaceAll(scenario.Name, " ", "_")))
 
-	if err := g.GenerateAIMDChartWithLogScale(cfg, scenario, filename); err != nil {
+	if err := g.GenerateChartWithLogScale(cfg, scenario, filename); err != nil {
 		fmt.Printf("Warning: failed to generate log scale chart for %s: %v\n", scenario.Name, err)
 	}
 }

@@ -59,7 +59,7 @@ type SimulationResult struct {
 type ComparisonData struct {
 	BlockNumbers       []float64 `json:"blockNumbers"`
 	ActualBaseFees     []float64 `json:"actualBaseFees"`
-	AIMDBaseFees       []float64 `json:"aimdBaseFees"`
+	SimulatedBaseFees  []float64 `json:"simulatedBaseFees"`
 	DroppedPercentages []float64 `json:"droppedPercentages"`
 	ActualGasUsages    []float64 `json:"actualGasUsages"`
 	EffectiveGasUsages []float64 `json:"effectiveGasUsages"`

@@ -32,27 +32,27 @@ func main() {
 
 	// Parse configuration
 	parser := config.NewParser()
-	cfg, simCfg, err := parser.Parse(os.Args[1:])
+	cfg, err := parser.Parse(os.Args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if simCfg.ShowHelp {
+	if cfg.Simulation.ShowHelp {
 		return
 	}
 
 	// Print configuration summary
-	printConfigSummary(*cfg, *simCfg)
+	printConfigSummary(*cfg)
 
 	// Initialize components
-	scenarioGenerator := scenarios.NewGenerator(*cfg)
+	scenarioGenerator := scenarios.NewGenerator(cfg.Simulation)
 	analyzer := analysis.NewAnalyzer(*cfg)
 	chartGenerator := visualization.NewGenerator()
 
 	// Determine which scenarios to run
 	var scenariosToRun []scenarios.Scenario
-	if simCfg.Scenario == "all" {
+	if cfg.Simulation.Scenario == "all" {
 		allScenarios := scenarioGenerator.GenerateAll(*cfg)
 		scenariosToRun = []scenarios.Scenario{
 			allScenarios["full"],
@@ -61,9 +61,9 @@ func main() {
 			allScenarios["mixed"],
 		}
 	} else {
-		scenario, exists := scenarioGenerator.GetByName(simCfg.Scenario, *cfg)
+		scenario, exists := scenarioGenerator.GetByName(cfg.Simulation.Scenario, *cfg)
 		if !exists {
-			fmt.Fprintf(os.Stderr, "Unknown scenario: %s\n", simCfg.Scenario)
+			fmt.Fprintf(os.Stderr, "Unknown scenario: %s\n", cfg.Simulation.Scenario)
 			os.Exit(1)
 		}
 		scenariosToRun = []scenarios.Scenario{scenario}
@@ -74,8 +74,8 @@ func main() {
 		runBasicSimulation(*cfg, scenario)
 
 		// Generate charts if requested
-		if simCfg.EnableGraphs {
-			if simCfg.LogScale {
+		if cfg.Simulation.EnableGraphs {
+			if cfg.Simulation.LogScale {
 				chartGenerator.GenerateChartForScenarioWithLogScale(*cfg, scenario)
 			} else {
 				chartGenerator.GenerateChartForScenario(*cfg, scenario)
@@ -93,12 +93,12 @@ func main() {
 	// Print comprehensive analysis
 	analysis.PrintResults(analysisResults)
 
-	if simCfg.EnableGraphs {
+	if cfg.Simulation.EnableGraphs {
 		fmt.Printf("\nVisualization files generated:\n")
 		for _, scenario := range scenariosToRun {
 			scaleType := "linear"
 			suffix := ""
-			if simCfg.LogScale {
+			if cfg.Simulation.LogScale {
 				scaleType = "logarithmic"
 				suffix = "_log"
 			}
@@ -109,20 +109,52 @@ func main() {
 }
 
 // printConfigSummary prints the configuration being used
-func printConfigSummary(cfg config.Config, simCfg config.SimulationConfig) {
-	fmt.Printf("Running AIMD Fee Market Simulation with configuration:\n")
-	fmt.Printf("  Target Block Size: %d gas\n", cfg.TargetBlockSize)
-	fmt.Printf("  Burst Multiplier: %.1fx (%.0f M gas max)\n", cfg.BurstMultiplier,
+func printConfigSummary(cfg config.Config) {
+	simCfg := cfg.Simulation
+	adjusterCfg := cfg.Adjuster
+
+	fmt.Printf("Running Fee Market Simulation with configuration:\n")
+	fmt.Printf("  Adjuster Type: %s\n", cfg.Simulation.AdjusterType)
+
+	// Core parameters (always shown)
+	fmt.Printf("  Target Block Size: %d gas (%.1f M)\n", cfg.TargetBlockSize, float64(cfg.TargetBlockSize)/1e6)
+	fmt.Printf("  Burst Multiplier: %.1fx (%.1f M gas max)\n", cfg.BurstMultiplier,
 		float64(cfg.TargetBlockSize)*cfg.BurstMultiplier/1e6)
-	fmt.Printf("  Window Size: %d blocks\n", cfg.WindowSize)
-	fmt.Printf("  Gamma: %.3f\n", cfg.Gamma)
-	fmt.Printf("  Learning Rate Range: %.6f - %.6f\n", cfg.MinLearningRate, cfg.MaxLearningRate)
-	fmt.Printf("  Alpha: %.6f, Beta: %.6f\n", cfg.Alpha, cfg.Beta)
-	fmt.Printf("  Delta: %.9f\n", cfg.Delta)
 	fmt.Printf("  Initial Base Fee: %.3f Gwei\n", float64(cfg.InitialBaseFee)/1e9)
 	fmt.Printf("  Min Base Fee: %.3f Gwei\n", float64(cfg.MinBaseFee)/1e9)
-	fmt.Printf("  Initial Learning Rate: %.6f\n", cfg.InitialLearningRate)
-	fmt.Printf("  Randomness Factor: %.1f%%\n", cfg.RandomnessFactor*100)
+	if simCfg.Randomizer.GaussianNoise > 0 || simCfg.Randomizer.BurstProbability > 0 {
+		fmt.Printf("  Randomizer Seed: %d\n", simCfg.Randomizer.Seed)
+		if simCfg.Randomizer.GaussianNoise > 0 {
+			fmt.Printf("  Gaussian Noise: %.1f%%\n", simCfg.Randomizer.GaussianNoise*100)
+		}
+		if simCfg.Randomizer.BurstProbability > 0 {
+			fmt.Printf("  Burst Probability: %.1f%%\n", simCfg.Randomizer.BurstProbability*100)
+			fmt.Printf("  Burst Duration Min: %d blocks\n", simCfg.Randomizer.BurstDurationMin)
+			fmt.Printf("  Burst Duration Max: %d blocks\n", simCfg.Randomizer.BurstDurationMax)
+			fmt.Printf("  Burst Intensity: %.1f\n", simCfg.Randomizer.BurstIntensity)
+		}
+	}
+
+	// Algorithm-specific parameters
+	switch simCfg.AdjusterType {
+	case "aimd":
+		fmt.Printf("  Window Size: %d blocks\n", cfg.WindowSize)
+		fmt.Printf("  Gamma: %.3f\n", adjusterCfg.AIMD.Gamma)
+		fmt.Printf("  Learning Rate Range: %.6f - %.6f\n", adjusterCfg.AIMD.MinLearningRate, adjusterCfg.AIMD.MaxLearningRate)
+		fmt.Printf("  Alpha: %.6f, Beta: %.6f\n", adjusterCfg.AIMD.Alpha, adjusterCfg.AIMD.Beta)
+		fmt.Printf("  Delta: %.9f\n", adjusterCfg.AIMD.Delta)
+		fmt.Printf("  Initial Learning Rate: %.6f\n", adjusterCfg.AIMD.InitialLearningRate)
+
+	case "eip1559", "eip-1559":
+		fmt.Printf("  Max Fee Change: %.1f%% per block\n", adjusterCfg.EIP1559.MaxFeeChange*100)
+
+	case "pid":
+		fmt.Printf("  Window Size: %d blocks\n", cfg.WindowSize)
+		fmt.Printf("  PID Gains: Kp=%.3f, Ki=%.3f, Kd=%.3f\n", adjusterCfg.PID.Kp, adjusterCfg.PID.Ki, adjusterCfg.PID.Kd)
+		fmt.Printf("  Max Fee Change: %.1f%% per block\n", adjusterCfg.PID.MaxFeeChange*100)
+		fmt.Printf("  Integral Limits: %.1f to %.1f\n", adjusterCfg.PID.MinIntegral, adjusterCfg.PID.MaxIntegral)
+	}
+
 	fmt.Printf("  Scenario: %s\n", simCfg.Scenario)
 	fmt.Printf("  Generate Charts: %t\n", simCfg.EnableGraphs)
 	if simCfg.EnableGraphs {
@@ -137,13 +169,29 @@ func printConfigSummary(cfg config.Config, simCfg config.SimulationConfig) {
 
 // runBasicSimulation runs a basic simulation and prints results
 func runBasicSimulation(cfg config.Config, scenario scenarios.Scenario) {
+	simCfg := cfg.Simulation
+
 	fmt.Printf("\n=== Simulation: %s ===\n", scenario.Name)
 	fmt.Printf("Description: %s\n", scenario.Description)
+	fmt.Printf("Adjuster Type: %s\n", simCfg.AdjusterType)
 	fmt.Printf("Burst Capacity: %.1fx target (%.0f M gas max)\n",
 		cfg.BurstMultiplier, float64(cfg.TargetBlockSize)*cfg.BurstMultiplier/1e6)
-	fmt.Printf("Randomness Factor: %.1f%%\n\n", cfg.RandomnessFactor*100)
+	fmt.Println()
 
-	adjuster := simulator.NewFeeAdjuster(cfg)
+	// Parse adjuster type and create adjuster
+	adjusterType, err := simulator.ParseAdjusterType(simCfg.AdjusterType)
+	if err != nil {
+		fmt.Printf("Error: Invalid adjuster type: %v\n", err)
+		return
+	}
+
+	factory := simulator.NewAdjusterFactory()
+	adjuster, err := factory.CreateAdjusterWithConfigs(adjusterType, &cfg)
+
+	if err != nil {
+		fmt.Printf("Error: Failed to create adjuster: %v\n", err)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Block\tGas Used\tTarget %\tBurst %\tBase Fee\tLearning Rate\tTarget Util")
@@ -263,7 +311,7 @@ func handleSimulateBase() {
 
 	// Parse remaining flags
 	parser := config.NewParser()
-	cfg, simCfg, err := parser.Parse(os.Args[3:])
+	cfg, err := parser.Parse(os.Args[3:])
 	if err != nil {
 		fmt.Printf("Configuration error: %v\n", err)
 		return
@@ -285,12 +333,19 @@ func handleSimulateBase() {
 
 	fmt.Printf("✅ Loaded valid dataset with %d blocks\n", len(dataset.Blocks))
 
+	// Parse adjuster type
+	adjusterType, err := simulator.ParseAdjusterType(cfg.Simulation.AdjusterType)
+	if err != nil {
+		fmt.Printf("Invalid adjuster type: %v\n", err)
+		return
+	}
+
 	// Create blockchain simulator and chart generator
-	blockchainSim := blockchain.NewSimulator(*cfg)
+	blockchainSim := blockchain.NewSimulator(*cfg, adjusterType)
 	chartGenerator := visualization.NewGenerator()
 
 	// Run simulation against the dataset
-	simResult, analysisResult, err := blockchainSim.SimulateAgainstDataSetWithOptions(dataset, simCfg.EnableGraphs)
+	simResult, analysisResult, err := blockchainSim.SimulateAgainstDataSetWithOptions(dataset, cfg.Simulation.EnableGraphs)
 	if err != nil {
 		fmt.Printf("Simulation failed: %v\n", err)
 		return
@@ -303,9 +358,9 @@ func handleSimulateBase() {
 	blockchainSim.CompareWithActualBaseFees(dataset, simResult)
 
 	// Generate charts if requested
-	if simCfg.EnableGraphs {
+	if cfg.Simulation.EnableGraphs {
 		filename := fmt.Sprintf("base_comparison_%d_%d.html", dataset.StartBlock, dataset.EndBlock)
-		if simCfg.LogScale {
+		if cfg.Simulation.LogScale {
 			chartGenerator.GenerateBaseComparisonChartWithLogScale(*cfg, dataset, simResult, filename)
 		} else {
 			chartGenerator.GenerateBaseComparisonChart(*cfg, dataset, simResult, filename)
@@ -313,7 +368,7 @@ func handleSimulateBase() {
 
 		fmt.Printf("\nVisualization files generated:\n")
 		scaleType := "linear"
-		if simCfg.LogScale {
+		if cfg.Simulation.LogScale {
 			scaleType = "logarithmic"
 		}
 		fmt.Printf("  - %s (AIMD vs Base fee comparison - %s scale)\n", filename, scaleType)

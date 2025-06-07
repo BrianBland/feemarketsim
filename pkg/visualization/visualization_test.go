@@ -8,6 +8,7 @@ import (
 	"github.com/brianbland/feemarketsim/pkg/blockchain"
 	"github.com/brianbland/feemarketsim/pkg/config"
 	"github.com/brianbland/feemarketsim/pkg/scenarios"
+	"github.com/brianbland/feemarketsim/pkg/simulator"
 )
 
 func TestNewGenerator(t *testing.T) {
@@ -20,22 +21,17 @@ func TestNewGenerator(t *testing.T) {
 	var _ ChartGenerator = generator
 }
 
-func TestGenerateAIMDChart(t *testing.T) {
+func TestGenerateChart(t *testing.T) {
 	// Create test configuration
 	cfg := config.Config{
-		TargetBlockSize:     15000000,
-		InitialBaseFee:      1000000000,
-		MinBaseFee:          1,
-		InitialLearningRate: 0.1,
-		MinLearningRate:     0.001,
-		MaxLearningRate:     0.5,
-		Alpha:               0.01,
-		Beta:                0.9,
-		Delta:               0.000001,
-		Gamma:               0.2,
-		BurstMultiplier:     2.0,
-		WindowSize:          10,
-		RandomnessFactor:    0.0,
+		TargetBlockSize: 15000000,
+		InitialBaseFee:  1000000000,
+		MinBaseFee:      1,
+		BurstMultiplier: 2.0,
+		WindowSize:      10,
+		Simulation: config.SimulationConfig{
+			AdjusterType: "aimd",
+		},
 	}
 
 	// Create test scenario
@@ -51,9 +47,9 @@ func TestGenerateAIMDChart(t *testing.T) {
 	// Clean up any existing test file
 	defer os.Remove(testFile)
 
-	err := generator.GenerateAIMDChart(cfg, scenario, testFile)
+	err := generator.GenerateChart(cfg, scenario, testFile)
 	if err != nil {
-		t.Fatalf("GenerateAIMDChart failed: %v", err)
+		t.Fatalf("GenerateChart failed: %v", err)
 	}
 
 	// Verify file was created
@@ -65,19 +61,14 @@ func TestGenerateAIMDChart(t *testing.T) {
 func TestGenerateBaseComparisonChart(t *testing.T) {
 	// Create test configuration
 	cfg := config.Config{
-		TargetBlockSize:     15000000,
-		InitialBaseFee:      1000000000,
-		MinBaseFee:          1,
-		InitialLearningRate: 0.1,
-		MinLearningRate:     0.001,
-		MaxLearningRate:     0.5,
-		Alpha:               0.01,
-		Beta:                0.9,
-		Delta:               0.000001,
-		Gamma:               0.2,
-		BurstMultiplier:     2.0,
-		WindowSize:          10,
-		RandomnessFactor:    0.0,
+		TargetBlockSize: 15000000,
+		InitialBaseFee:  1000000000,
+		MinBaseFee:      1,
+		BurstMultiplier: 2.0,
+		WindowSize:      10,
+		Simulation: config.SimulationConfig{
+			AdjusterType: "aimd",
+		},
 	}
 
 	// Create test dataset
@@ -145,7 +136,8 @@ func TestGenerateBaseComparisonChart(t *testing.T) {
 		os.Remove(gasFile)
 	}()
 
-	simulator := blockchain.NewSimulator(cfg)
+	// Create blockchain simulator with the correct signature
+	simulator := blockchain.NewSimulator(cfg, simulator.AdjusterTypeAIMD)
 	simResult, err := simulator.SimulateForVisualization(dataset)
 	if err != nil {
 		t.Fatalf("SimulateForVisualization failed: %v", err)
@@ -170,19 +162,14 @@ func TestGenerateBaseComparisonChart(t *testing.T) {
 
 func TestGenerateChartForScenario(t *testing.T) {
 	cfg := config.Config{
-		TargetBlockSize:     15000000,
-		InitialBaseFee:      1000000000,
-		MinBaseFee:          1,
-		InitialLearningRate: 0.1,
-		MinLearningRate:     0.001,
-		MaxLearningRate:     0.5,
-		Alpha:               0.01,
-		Beta:                0.9,
-		Delta:               0.000001,
-		Gamma:               0.2,
-		BurstMultiplier:     2.0,
-		WindowSize:          10,
-		RandomnessFactor:    0.0,
+		TargetBlockSize: 15000000,
+		InitialBaseFee:  1000000000,
+		MinBaseFee:      1,
+		BurstMultiplier: 2.0,
+		WindowSize:      10,
+		Simulation: config.SimulationConfig{
+			AdjusterType: "aimd",
+		},
 	}
 
 	scenario := scenarios.Scenario{
@@ -224,7 +211,7 @@ func TestChartDataStructures(t *testing.T) {
 	compData := blockchain.ComparisonData{
 		BlockNumbers:       []float64{1, 2},
 		ActualBaseFees:     []float64{1.0, 1.1},
-		AIMDBaseFees:       []float64{1.05, 1.15},
+		SimulatedBaseFees:  []float64{1.05, 1.15},
 		DroppedPercentages: []float64{2.5, 3.0},
 		ActualGasUsages:    []float64{15, 16},
 		EffectiveGasUsages: []float64{14.5, 15.5},
@@ -257,21 +244,16 @@ func TestChartOptions(t *testing.T) {
 	}
 }
 
-func TestGenerateAIMDChartWithLogScale(t *testing.T) {
+func TestGenerateChartWithLogScale(t *testing.T) {
 	cfg := config.Config{
-		TargetBlockSize:     15000000,
-		InitialBaseFee:      1000000000,
-		MinBaseFee:          1,
-		InitialLearningRate: 0.1,
-		MinLearningRate:     0.001,
-		MaxLearningRate:     0.5,
-		Alpha:               0.01,
-		Beta:                0.9,
-		Delta:               0.000001,
-		Gamma:               0.2,
-		BurstMultiplier:     2.0,
-		WindowSize:          10,
-		RandomnessFactor:    0.0,
+		TargetBlockSize: 15000000,
+		InitialBaseFee:  1000000000,
+		MinBaseFee:      1,
+		BurstMultiplier: 2.0,
+		WindowSize:      10,
+		Simulation: config.SimulationConfig{
+			AdjusterType: "aimd",
+		},
 	}
 
 	scenario := scenarios.Scenario{
@@ -280,9 +262,9 @@ func TestGenerateAIMDChartWithLogScale(t *testing.T) {
 	}
 
 	gen := NewGenerator()
-	err := gen.GenerateAIMDChartWithLogScale(cfg, scenario, "test_chart_log.html")
+	err := gen.GenerateChartWithLogScale(cfg, scenario, "test_chart_log.html")
 	if err != nil {
-		t.Fatalf("Failed to generate AIMD chart with log scale: %v", err)
+		t.Fatalf("Failed to generate chart with log scale: %v", err)
 	}
 
 	// Check if file was created
@@ -296,19 +278,14 @@ func TestGenerateAIMDChartWithLogScale(t *testing.T) {
 
 func TestGenerateBaseComparisonChartWithLogScale(t *testing.T) {
 	cfg := config.Config{
-		TargetBlockSize:     15000000,
-		InitialBaseFee:      1000000000,
-		MinBaseFee:          1,
-		InitialLearningRate: 0.1,
-		MinLearningRate:     0.001,
-		MaxLearningRate:     0.5,
-		Alpha:               0.01,
-		Beta:                0.9,
-		Delta:               0.000001,
-		Gamma:               0.2,
-		BurstMultiplier:     2.0,
-		WindowSize:          10,
-		RandomnessFactor:    0.0,
+		TargetBlockSize: 15000000,
+		InitialBaseFee:  1000000000,
+		MinBaseFee:      1,
+		BurstMultiplier: 2.0,
+		WindowSize:      10,
+		Simulation: config.SimulationConfig{
+			AdjusterType: "aimd",
+		},
 	}
 
 	// Create test dataset using the correct structure
@@ -366,9 +343,9 @@ func TestGenerateBaseComparisonChartWithLogScale(t *testing.T) {
 		},
 	}
 
-	// Run simulation using the correct simulator
-	simulator := blockchain.NewSimulator(cfg)
-	simResult, err := simulator.SimulateForVisualization(dataset)
+	// Run simulation using the correct simulator constructor
+	sim := blockchain.NewSimulator(cfg, simulator.AdjusterTypeAIMD)
+	simResult, err := sim.SimulateForVisualization(dataset)
 	if err != nil {
 		t.Fatalf("Failed to run simulation: %v", err)
 	}
