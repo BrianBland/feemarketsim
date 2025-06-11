@@ -201,7 +201,7 @@ func (p *Parser) Validate() error {
 	a := &p.config.Adjuster
 
 	// Validate adjuster type
-	validAdjusterTypes := []string{"aimd", "eip1559", "eip-1559", "pid"}
+	validAdjusterTypes := []string{"aimd", "eip1559", "eip-1559", "pid", "batcher-slow-pid", "sequencer-fast-pid", "hierarchical-pid"}
 	isValidAdjusterType := false
 	for _, validType := range validAdjusterTypes {
 		if s.AdjusterType == validType {
