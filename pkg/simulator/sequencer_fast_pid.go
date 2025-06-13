@@ -47,10 +47,10 @@ func DefaultSequencerFastPIDConfig() *SequencerFastPIDConfig {
 		InitialBaseFee:  1_000_000_000,
 		MinBaseFee:      0,
 
-		// Aggressive PID tuning for fast response
-		Kp: 0.8,  // High proportional gain for immediate response
-		Ki: 0.15, // Moderate integral for sustained adjustments
-		Kd: 0.25, // High derivative for predictive control
+		// Tuned PID parameters
+		Kp: 2.0,   // Tuned proportional gain
+		Ki: 0.306, // Tuned integral gain
+		Kd: 0.3,   // Tuned derivative gain
 
 		// Integral limits
 		MaxIntegral: 5.0,

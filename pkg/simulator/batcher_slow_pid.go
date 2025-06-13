@@ -77,10 +77,10 @@ func DefaultBatcherSlowPIDConfig() *BatcherSlowPIDConfig {
 		UpdateFrequency:  30 * time.Second, // Update every 30 seconds
 		L1ResponseWindow: 5 * time.Minute,  // Analyze 5min of L1 trends
 
-		// Conservative PID tuning for strategic control
-		Kp: 0.3,  // Moderate proportional response to DA pressure
-		Ki: 0.05, // Slow integral action for sustained issues
-		Kd: 0.1,  // Derivative to predict L1 trends
+		// Tuned PID parameters for strategic control
+		Kp: 2.0,   // Tuned proportional gain
+		Ki: 0.306, // Tuned integral gain
+		Kd: 0.3,   // Tuned derivative gain
 
 		// DA management targets
 		TargetDAUtilization: 0.75,                    // Target 75% DA utilization
