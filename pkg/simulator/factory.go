@@ -11,9 +11,12 @@ import (
 type AdjusterType string
 
 const (
-	AdjusterTypeAIMD    AdjusterType = "aimd"
-	AdjusterTypeEIP1559 AdjusterType = "eip1559"
-	AdjusterTypePID     AdjusterType = "pid"
+	AdjusterTypeAIMD             AdjusterType = "aimd"
+	AdjusterTypeEIP1559          AdjusterType = "eip1559"
+	AdjusterTypePID              AdjusterType = "pid"
+	AdjusterTypeBatcherSlowPID   AdjusterType = "batcher-slow-pid"
+	AdjusterTypeSequencerFastPID AdjusterType = "sequencer-fast-pid"
+	AdjusterTypeHierarchicalPID  AdjusterType = "hierarchical-pid"
 )
 
 // AdjusterFactory creates fee adjusters based on configuration
@@ -70,6 +73,30 @@ func (f *AdjusterFactory) CreateAdjuster(adjusterType AdjusterType, cfg config.C
 		}
 		return NewPIDFeeAdjuster(pidConfig), nil
 
+	case AdjusterTypeBatcherSlowPID:
+		batcherConfig := DefaultBatcherSlowPIDConfig()
+		batcherConfig.TargetBlockSize = cfg.TargetBlockSize
+		batcherConfig.BurstMultiplier = cfg.BurstMultiplier
+		batcherConfig.InitialBaseFee = cfg.InitialBaseFee
+		batcherConfig.MinBaseFee = cfg.MinBaseFee
+		return NewBatcherSlowPID(batcherConfig), nil
+
+	case AdjusterTypeSequencerFastPID:
+		fastPIDConfig := DefaultSequencerFastPIDConfig()
+		fastPIDConfig.TargetBlockSize = cfg.TargetBlockSize
+		fastPIDConfig.BurstMultiplier = cfg.BurstMultiplier
+		fastPIDConfig.InitialBaseFee = cfg.InitialBaseFee
+		fastPIDConfig.MinBaseFee = cfg.MinBaseFee
+		return NewSequencerFastPID(fastPIDConfig), nil
+
+	case AdjusterTypeHierarchicalPID:
+		hierarchicalConfig := DefaultHierarchicalPIDConfig()
+		hierarchicalConfig.TargetBlockSize = cfg.TargetBlockSize
+		hierarchicalConfig.BurstMultiplier = cfg.BurstMultiplier
+		hierarchicalConfig.InitialBaseFee = cfg.InitialBaseFee
+		hierarchicalConfig.MinBaseFee = cfg.MinBaseFee
+		return NewHierarchicalPID(hierarchicalConfig), nil
+
 	default:
 		return nil, fmt.Errorf("unknown adjuster type: %s", adjusterType)
 	}
@@ -90,6 +117,30 @@ func (f *AdjusterFactory) CreateAdjusterWithConfigs(adjusterType AdjusterType, c
 		pidConfig := ConvertToPIDConfig(cfg)
 		return NewPIDFeeAdjuster(pidConfig), nil
 
+	case AdjusterTypeBatcherSlowPID:
+		batcherConfig := DefaultBatcherSlowPIDConfig()
+		batcherConfig.TargetBlockSize = cfg.TargetBlockSize
+		batcherConfig.BurstMultiplier = cfg.BurstMultiplier
+		batcherConfig.InitialBaseFee = cfg.InitialBaseFee
+		batcherConfig.MinBaseFee = cfg.MinBaseFee
+		return NewBatcherSlowPID(batcherConfig), nil
+
+	case AdjusterTypeSequencerFastPID:
+		fastPIDConfig := DefaultSequencerFastPIDConfig()
+		fastPIDConfig.TargetBlockSize = cfg.TargetBlockSize
+		fastPIDConfig.BurstMultiplier = cfg.BurstMultiplier
+		fastPIDConfig.InitialBaseFee = cfg.InitialBaseFee
+		fastPIDConfig.MinBaseFee = cfg.MinBaseFee
+		return NewSequencerFastPID(fastPIDConfig), nil
+
+	case AdjusterTypeHierarchicalPID:
+		hierarchicalConfig := DefaultHierarchicalPIDConfig()
+		hierarchicalConfig.TargetBlockSize = cfg.TargetBlockSize
+		hierarchicalConfig.BurstMultiplier = cfg.BurstMultiplier
+		hierarchicalConfig.InitialBaseFee = cfg.InitialBaseFee
+		hierarchicalConfig.MinBaseFee = cfg.MinBaseFee
+		return NewHierarchicalPID(hierarchicalConfig), nil
+
 	default:
 		return nil, fmt.Errorf("unknown adjuster type: %s", adjusterType)
 	}
@@ -101,6 +152,9 @@ func (f *AdjusterFactory) GetAvailableTypes() []AdjusterType {
 		AdjusterTypeAIMD,
 		AdjusterTypeEIP1559,
 		AdjusterTypePID,
+		AdjusterTypeBatcherSlowPID,
+		AdjusterTypeSequencerFastPID,
+		AdjusterTypeHierarchicalPID,
 	}
 }
 
@@ -113,6 +167,12 @@ func (f *AdjusterFactory) GetTypeDescription(adjusterType AdjusterType) string {
 		return "EIP-1559 - Standard Ethereum fee adjustment mechanism"
 	case AdjusterTypePID:
 		return "PID Controller - Proportional-Integral-Derivative control system"
+	case AdjusterTypeBatcherSlowPID:
+		return "Batcher Slow PID - Strategic DA cost management with sequencer coordination"
+	case AdjusterTypeSequencerFastPID:
+		return "Sequencer Fast PID - Fast DA cost management with sequencer coordination"
+	case AdjusterTypeHierarchicalPID:
+		return "Hierarchical PID - Two-layer control system combining strategic and tactical adjustments"
 	default:
 		return "Unknown adjuster type"
 	}
@@ -127,6 +187,12 @@ func ParseAdjusterType(s string) (AdjusterType, error) {
 		return AdjusterTypeEIP1559, nil
 	case "pid":
 		return AdjusterTypePID, nil
+	case "batcher-slow-pid", "batcher_slow_pid":
+		return AdjusterTypeBatcherSlowPID, nil
+	case "sequencer-fast-pid":
+		return AdjusterTypeSequencerFastPID, nil
+	case "hierarchical-pid":
+		return AdjusterTypeHierarchicalPID, nil
 	default:
 		return "", fmt.Errorf("unknown adjuster type: %s", s)
 	}
